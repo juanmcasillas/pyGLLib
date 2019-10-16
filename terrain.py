@@ -16,8 +16,8 @@ class Terrain:
     def fillRandom(self):
         for j in range(self.height):
             for i in range(self.width):
-                self.vertex[self.I(i,j)] = random.uniform( 0, 0.5)
-    
+                self.vertex[self.I(i,j)] = random.uniform( 0, 1.0)
+                #elf.vertex[self.I(i,j)] = (i*j % 4)
     def set(self, x, y, z=0):
         #print(x,y, self.I(x,y))
         self.vertex[self.I(x,y)] = z
@@ -127,14 +127,21 @@ class Terrain:
 
 class GLTerrain(pyGLLib.object.GLObjectBaseEBO):
     "Use the EBO object as we have pos,normal in the coords"
-    def __init__(self, size):
+    def __init__(self, size, points=None):
         super().__init__()
         self.size = size
         self.width, self.height = self.size
         self.terrain = Terrain(self.width, self.height)
+        self.points = points
 
     def load_model(self):
-        self.terrain.fillRandom()
+        if self.points is not None:
+            # hack for now, try to fix asap
+            for p in self.points:
+                i,j,k = p
+                self.terrain.set(i,j,k)
+        else:
+            self.terrain.fillRandom()
         W = self.terrain.width-1
         H = self.terrain.height-1
         D = max(self.terrain.width,self.terrain.height)

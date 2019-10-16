@@ -152,26 +152,31 @@ class GLShaderAmbient(GLShaderBase):
         self.program = None
         self.vertex_shader = """
             #version 330 core
-            layout(location = 0) in vec3 aPos; 
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aNormal;
+
+            out vec3 FragPos;
+            out vec3 Normal;
+
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
 
-            out vec3 FragPos;
-
-            void main() {
-            // transform vertex
+            void main()
+            {
                 FragPos = vec3(model * vec4(aPos, 1.0));
-                gl_Position = projection * view * vec4(FragPos, 1.0);    
-                // gl_Position = projection * view * model * vec4(aPos, 1.0); 
+                Normal = aNormal;  
+                gl_Position = projection * view * vec4(FragPos, 1.0);
             }
             """
 
         # fragment shader (deals with the color)
         self.fragment_shader = """
             #version 330 core
-             in vec3 FragPos;  
-             out vec4 FragColor;
+            out vec4 FragColor;
+
+            in vec3 Normal;  
+            in vec3 FragPos;  
 
             struct Light {
                 vec3 position;
@@ -183,18 +188,31 @@ class GLShaderAmbient(GLShaderBase):
                 float linear;
                 float quadratic;
             };             
-            uniform Light light;
+            uniform Light light;            
             uniform vec3 objectColor;
 
-             void main() {                   
-                    vec3 ambient = light.ambient * light.color;
+            void main()
+            {
+                // ambient
+                
+                vec3 ambient = light.ambient * light.color;
+                
+                // diffuse 
+                vec3 norm = normalize(Normal);
+                vec3 lightDir = normalize(light.position - FragPos);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 diffuse = light.diffuse * diff * light.color;
 
-                    float distance = length(light.position - FragPos);
-                    float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
-                    ambient  *= attenuation;  
-                    vec3 result = ambient * objectColor;
-                    FragColor = vec4(result, 1.0);
-             }
+                // attenuation
+                float distance = length(light.position - FragPos);
+                float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
+                        
+                //ambient  *= attenuation; 
+                //diffuse  *= attenuation;
+
+                vec3 result = (ambient + diffuse) * objectColor;
+                FragColor = vec4(result, 1.0);
+            } 
             """
 
 # ///////////////////////////////////////////////////////////////////////////
