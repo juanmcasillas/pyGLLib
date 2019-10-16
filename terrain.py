@@ -86,7 +86,7 @@ class Terrain:
     def normalize_v3(self, arr):
         ''' Normalize a numpy array of 3 component vectors shape=(n,3) '''
         lens = np.sqrt( arr[:,0]**2 + arr[:,1]**2 + arr[:,2]**2 )
-        print("lens", lens)
+        #print("lens", lens)
         arr[:,0] /= lens
         arr[:,1] /= lens
         arr[:,2] /= lens                

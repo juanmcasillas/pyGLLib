@@ -90,7 +90,7 @@ class pyTerrain(pyGLLib.GLApp):
 
         self.load_callbacks()
         self.load_shaders()
-        ##self.set_light()
+        self.set_light()
         ##self.set_objects()
         self.add_object("terrain", terrain)
         self.add_object("cube", cube)
