@@ -10,25 +10,38 @@ import pyGLLib
 
 
 class pyCube(pyGLLib.GLApp):
-    def __init__(self, size, title, wireframe=False, grabmouse=True):
+    def __init__(self, size, title, wireframe=False, grabmouse=True, diffuse=True):
         super().__init__(size, title, wireframe=wireframe, grabmouse=grabmouse )
+
+        self.diffuse = diffuse
 
     def load_shaders(self):
         s = pyGLLib.shader.GLShaderAmbient()
         s.load()
         self.shaders["ambient"] = s
 
+        s = pyGLLib.shader.GLShaderDiffuse()
+        s.load()
+        self.shaders["diffuse"] = s
+
     def render(self):
-        #self.model_matrix = glm.mat4(1.0)
-        #self.model_matrix = glm.translate(self.model_matrix, (-0.5,0,0))
-        #self.model_matrix = glm.scale(self.model_matrix, glm.vec3(0.5))
+
+        if not self.diffuse:
+            self.shaders["ambient"].use()
+            self.shaders["ambient"].setMat4(b'model',self.model_matrix)
+            self.shaders["ambient"].setMat4(b'view',self.view_matrix)
+            self.shaders["ambient"].setMat4(b'projection',self.projection_matrix)
+            self.shaders["ambient"].setVec3(b'color',(1.0,0.5,0.5))
+            self.shaders["ambient"].setVec3(b'ligtColor',(1.0,1.0,1.0))
+        else:
+            self.shaders["diffuse"].use()
+            self.shaders["diffuse"].setMat4(b'model',self.model_matrix)
+            self.shaders["diffuse"].setMat4(b'view',self.view_matrix)
+            self.shaders["diffuse"].setMat4(b'projection',self.projection_matrix)
+            self.shaders["diffuse"].setVec3(b'objectColor',(1.0,0.5,0.31))
+            self.shaders["diffuse"].setVec3(b'lightPos',(1.2, 1.0, 2.0))
+            self.shaders["diffuse"].setVec3(b'lightColor',(1.0,1.0,1.0))
         
-        self.shaders["ambient"].use()
-        self.shaders["ambient"].setMat4(b'model',self.model_matrix)
-        self.shaders["ambient"].setMat4(b'view',self.view_matrix)
-        self.shaders["ambient"].setMat4(b'projection',self.projection_matrix)
-        self.shaders["ambient"].setVec3(b'color',(1.0,0.5,0.5))
-        self.shaders["ambient"].setVec3(b'ligtColor',(1.0,1.0,1.0))
         self.objects["cube"].draw()
 
     def main(self):
