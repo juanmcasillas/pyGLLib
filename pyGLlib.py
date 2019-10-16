@@ -23,6 +23,15 @@ import cv2
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+class GLLight:
+    def __init__(self):
+        self.pos = glm.vec3(0, 0.5, 3.0)
+        self.color = glm.vec3(1.0, 1.0, 1.0)
+        self.object = glm.vec3(1.0, 0.5, 0.31)
+        self.pos_id = None
+        self.color_id = None
+        self.object_id = None
+
 
 class GLCamera:
     def __init__(self, size):
@@ -85,22 +94,29 @@ class GLApp:
         # cameras
         self.camera = GLCamera(self.size)
 
+        # lights
+        self.light = GLLight()
+
   
         # vertex shader (deals with the geometric transformations)
         self.vertex_shader = """
             #version 330 core
             layout(location = 0) in vec3 aPos;
-            layout (location = 1) in vec3 color;    // color variable has attribute position 0
-            
+            layout (location = 1) in vec3 color;     // color variable has attribute position 1
+            layout (location = 2) in vec3 normal;    // normal vector is in 2
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
             
-            out vec3 ourColor; // color output to fragment shader
-            
+            out vec3 ourColor;    // color output to fragment shader
+            out vec3 ourNormal;   // the normal value to the fragment
+            out vec3 FragPos;
+
             void main() {
             // transform vertex
-                gl_Position = projection * view * model * vec4(aPos, 1.0); 
+                FragPos = vec3(model * vec4(aPos, 1.0));
+                ourNormal = normal;
+                gl_Position = projection * view * vec4(FragPos, 1.0); 
                 ourColor = color; // Set the color to the input color from the vertex data
             }
             """
@@ -109,9 +125,29 @@ class GLApp:
         self.fragment_shader = """
             #version 330 core
             in vec3 ourColor;
+            in vec3 ourNormal; 
+            in vec3 FragPos;   
             out vec4 FragColor;
+
+            uniform vec3 lightPos; 
+            uniform vec3 lightColor; 
+            uniform vec3 objectColor; 
+
             void main() {
-                FragColor = vec4(ourColor, 1.0f);
+                
+
+                float ambientStrength = 0.3;
+                vec3 ambient = ambientStrength * lightColor;
+                
+                // diffuse 
+                vec3 norm = normalize(ourNormal);
+                vec3 lightDir = normalize(lightPos - FragPos);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 diffuse = diff * lightColor;
+                        
+                vec3 result = (ambient + diffuse) * objectColor;
+                FragColor = vec4(result, 1.0);
+                //FragColor = vec4(ourColor, 1.0f);
             }
             """
 
@@ -192,6 +228,7 @@ class GLApp:
         self.view_matrix_id       = GL.glGetUniformLocation(self.shaderProgram,  b'view')
         self.projection_matrix_id = GL.glGetUniformLocation(self.shaderProgram,  b'projection')
 
+
         # ///////////////////////////////////////////////////////////////////////////
         #
         #  load here the data!
@@ -215,7 +252,8 @@ class GLApp:
 
         # enable array and set up data - calculating stride length, wow; not documented
         # 6 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader)
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
+        # 9 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader), 3 -> 9 normals
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (9 * ctypes.sizeof(_types.GLfloat)), None)
         GL.glEnableVertexAttribArray(0)
 
         # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
@@ -223,14 +261,23 @@ class GLApp:
         # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
         # Again, 6 -> 3 pos, 3 color Array(1)->Color (see Vertex shader)
         GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
-                        (6 * ctypes.sizeof(_types.GLfloat)), 
+                        (9 * ctypes.sizeof(_types.GLfloat)), 
                         ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
+        GL.glEnableVertexAttribArray(1)
+
+        GL.glVertexAttribPointer(2, 3, GL.GL_FLOAT, GL.GL_FALSE, 
+                        (9 * ctypes.sizeof(_types.GLfloat)), 
+                        ctypes.c_void_p((6 * ctypes.sizeof(_types.GLfloat))))
         GL.glEnableVertexAttribArray(1)
 
         # Unbind so we don't mess w/ them
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0) 
 
+    def set_light(self):
+        self.light.pos_id = GL.glGetUniformLocation(self.shaderProgram,  b'lightPos')
+        self.light.color_id = GL.glGetUniformLocation(self.shaderProgram,  b'lightColor')
+        self.light.object_id = GL.glGetUniformLocation(self.shaderProgram,  b'objectColor')
 
     def load_model(self):
         vertexData = np.array([
@@ -341,6 +388,9 @@ class GLApp:
             def Mat2NP(mat):
                 return np.array( list(map(lambda x: list(x), list(mat))), dtype=np.float32 )
 
+            def Vec3toNP(mat):
+                return np.array( list(map(lambda x: list(x), list(mat))), dtype=np.float32 )
+
             self.model_matrix = glm.mat4(1.0)
             self.view_matrix = glm.mat4(1.0)
             self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
@@ -353,12 +403,17 @@ class GLApp:
             GL.glUniformMatrix4fv(self.model_matrix_id,      1, GL.GL_FALSE, glm.value_ptr(self.model_matrix))
             GL.glUniformMatrix4fv(self.view_matrix_id,       1, GL.GL_FALSE, glm.value_ptr(self.view_matrix))
             GL.glUniformMatrix4fv(self.projection_matrix_id, 1, GL.GL_FALSE, glm.value_ptr(self.projection_matrix))
-            
+            GL.glUniform3fv(self.light.pos_id,  1, list(self.light.pos))
+            GL.glUniform3fv(self.light.color_id,  1, list(self.light.color))
+            GL.glUniform3fv(self.light.object_id,  1, list(self.light.object))
+
+
+
             # bind VAO
             try:
                 GL.glBindVertexArray(self.VAO)
                 # draw vertex
-                #GL.glDrawArrays(GL_TRIANGLES, 0, 3*ntri) # 6 -> 2
+                #GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.vertexData.size) # 6 -> 2
                 # draw indices
                 GL.glDrawElements(GL.GL_TRIANGLES, self.indexData.size, GL.GL_UNSIGNED_INT, None)
             finally:
@@ -386,6 +441,7 @@ if __name__ == "__main__":
     app = GLApp( (800,600), "PyGLLib Sample App", wireframe=True)
     app.init()
     app.load_shaders()
+    app.set_light()
     app.set_gl_buffers()
     app.load_callbacks()
     app.run()
