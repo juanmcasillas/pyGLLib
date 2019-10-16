@@ -42,13 +42,13 @@ class GLObjectBase:
         vertexData = np.array([
             # first triangle
             # Positions       # Color     
-             0.5,  0.5, 0.0,  1.0, 0.0, 0.0, # top right
-             0.5, -0.5, 0.0,  0.0, 1.0, 0.0, # bottom right
-            -0.5,  0.5, 0.0,  0.0, 0.0, 1.0, # top left
+             0.5,  0.5, 0.0,  # top right
+             0.5, -0.5, 0.0,  # bottom right
+            -0.5,  0.5, 0.0,  # top left
             # second triangle
-             0.5, -0.5, 0.0,  0.0, 1.0, 0.0, # bottom right
-            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0, # bottom left
-            -0.5,  0.5, 0.0,  1.0, 1.0, 0.0, # top left
+             0.5, -0.5, 0.0,  # bottom right
+            -0.5, -0.5, 0.0,  # bottom left
+            -0.5,  0.5, 0.0,  # top left
         ], dtype=np.float32)
 
         triangles = 2
@@ -67,19 +67,8 @@ class GLObjectBase:
         GL.glBufferData(GL.GL_ARRAY_BUFFER, self.vertexData.nbytes, self.vertexData, GL.GL_STATIC_DRAW)
 
         # enable array and set up data - calculating stride length, wow; not documented
-        # 6 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader)
-        # 9 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader), 3 -> 9 normals
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (3 * ctypes.sizeof(_types.GLfloat)), None)
         GL.glEnableVertexAttribArray(0)
-
-        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
-        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
-        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
-        # Again, 6 -> 3 pos, 3 color Array(1)->Color (see Vertex shader)
-        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
-                        (6 * ctypes.sizeof(_types.GLfloat)), 
-                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
-        GL.glEnableVertexAttribArray(1)
 
         # Unbind so we don't mess w/ them
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
@@ -125,6 +114,24 @@ class GLObjectBaseEBO(GLObjectBase):
         
         # bind to VAO to add the EBO...
         GL.glBindVertexArray(self.VAO)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.VBO)
+
+        # enable array and set up data - calculating stride length, wow; not documented
+        # 6 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader)
+        # 9 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader), 3 -> 9 normals
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
+        GL.glEnableVertexAttribArray(0)
+
+        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
+        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
+        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
+        # Again, 6 -> 3 pos, 3 color Array(1)->Color (see Vertex shader)
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
+                        (6 * ctypes.sizeof(_types.GLfloat)), 
+                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
+        GL.glEnableVertexAttribArray(1)
+
+
 
         # Make a EBO buffer here based on indexData
         self.EBO = GL.glGenBuffers(1)
@@ -132,6 +139,7 @@ class GLObjectBaseEBO(GLObjectBase):
         GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self.indexData.nbytes, self.indexData, GL.GL_STATIC_DRAW)         
         
         # Unbind so we don't mess w/ them
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)     
 
     def draw(self):
@@ -148,13 +156,13 @@ class GLObjectBaseEBO(GLObjectBase):
 class GLShaderBase:
     def __init__(self):
         # vertex shader (deals with the geometric transformations)
-
+        # this version is a plain color.
         self.program = None
         self.vertex_shader = """
             #version 330 core
-            layout(location = 0) in vec3 aPos;
-            layout (location = 1) in vec3 color;     // color variable has attribute position 1
-    
+            layout(location = 0) in vec3 aPos; 
+            uniform vec3 color;
+
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
@@ -226,12 +234,41 @@ class GLShaderBase:
                         list(vec))
         
 
+class GLShaderPlain(GLShaderBase):
+    def __init__(self):
+        super().__init__()
 
-
-class GLShaderColor(GLShaderBase):
+class GLShaderVertexColor(GLShaderBase):
     "the default shader, supports basic color from vertex"
     def __init__(self):
         super().__init__()
+        self.vertex_shader = """
+            #version 330 core
+            layout(location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 color;     // color variable has attribute position 1
+    
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+            
+            out vec3 ourColor;    // color output to fragment shader
+    
+            void main() {
+            // transform vertex
+                gl_Position = projection * view * model * vec4(aPos, 1.0); 
+                ourColor = color; // Set the color to the input color from the vertex data
+            }
+            """
+
+        # fragment shader (deals with the color)
+        self.fragment_shader = """
+            #version 330 core
+             in vec3 ourColor;
+             out vec4 FragColor;
+             void main() {
+                 FragColor = vec4(ourColor, 1.0f);
+             }
+            """        
 
 
 # ///////////////////////////////////////////////////////////////////////////
@@ -355,10 +392,16 @@ class GLApp:
 
 
     def load_shaders(self):
-        # set thte default shader.
-        s = GLShaderColor()
+        # set the shaders
+
+        s = GLShaderPlain()
         s.load()
-        self.shaders["default"] = s
+        self.shaders["plain"] = s
+
+
+        s = GLShaderVertexColor()
+        s.load()
+        self.shaders["color"] = s
 
 
     def set_objects(self):
@@ -457,20 +500,35 @@ class GLApp:
 
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
             
-            #self.view_matrix = glm.mat4(1.0)
-            self.model_matrix = glm.mat4(1.0)
+
+            #render
+
             self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
             self.view_matrix = glm.lookAt(self.camera.pos, self.camera.pos + self.camera.front, self.camera.up)
 
-            #render
-            self.shaders["default"].use()
-            self.shaders["default"].setMat4(b'model',self.model_matrix)
-            self.shaders["default"].setMat4(b'view',self.view_matrix)
-            self.shaders["default"].setMat4(b'projection',self.projection_matrix)
-
             # bind VAO
             try:
-                #self.objects["base"].draw()
+                # to the left
+                self.model_matrix = glm.mat4(1.0)
+                self.model_matrix = glm.translate(self.model_matrix, (-0.5,0,0))
+                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(0.5))
+                
+                self.shaders["plain"].use()
+                self.shaders["plain"].setMat4(b'model',self.model_matrix)
+                self.shaders["plain"].setMat4(b'view',self.view_matrix)
+                self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
+                self.shaders["plain"].setVec3(b'color',(1.0,0.5,0.5))
+                self.objects["base"].draw()
+
+                # to the right
+                self.model_matrix = glm.mat4(1.0)
+                self.model_matrix = glm.translate(self.model_matrix, (0.5,0,0))
+                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(1.1))
+
+                self.shaders["color"].use()
+                self.shaders["color"].setMat4(b'model',self.model_matrix)
+                self.shaders["color"].setMat4(b'view',self.view_matrix)
+                self.shaders["color"].setMat4(b'projection',self.projection_matrix)
                 self.objects["ebo"].draw()
             finally:
                 # unbind VAO
