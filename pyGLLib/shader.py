@@ -51,7 +51,7 @@ class GLShaderBase:
         
         self.program = GL.glCreateProgram()
         if not self.program:
-            raise RunTimeError('glCreateProgram faled!')
+            raise RuntimeError('glCreateProgram faled!')
 
         # attach shaders
         GL.glAttachShader(self.program, vertexShader)
@@ -66,9 +66,9 @@ class GLShaderBase:
             infoLen = GL.glGetProgramiv(self.program, GL.GL_INFO_LOG_LENGTH)
             infoLog = ""
             if infoLen > 1:
-                infoLog = GL.glGetProgramInfoLog(self.program, infoLen, None);
+                infoLog = GL.glGetProgramInfoLog(self.program)
             GL.glDeleteProgram(self.program)
-            raise RunTimeError("Error linking program:\n%s\n", infoLog);
+            raise RuntimeError("Error linking program:\n%s\n", infoLog)
 
         GL.glDeleteShader(vertexShader)
         GL.glDeleteShader(fragmentShader)
@@ -133,4 +133,111 @@ class GLShaderVertexColor(GLShaderBase):
              void main() {
                  FragColor = vec4(ourColor, 1.0f);
              }
-            """        
+            """      
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLShaderAmbient(GLShaderBase):
+    "support for ambient light"
+    def __init__(self):
+        # vertex shader (deals with the geometric transformations)
+        # this version is a plain color.
+        self.program = None
+        self.vertex_shader = """
+            #version 330 core
+            layout(location = 0) in vec3 aPos; 
+            uniform vec3 color;
+            uniform vec3 lightColor;
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+            
+            out vec3 objectColor;    // color output to fragment shader
+            out vec3 lightColorOut;    // color output to fragment shader
+            void main() {
+            // transform vertex
+                gl_Position = projection * view * model * vec4(aPos, 1.0); 
+
+            // color
+                objectColor = color; // Set the color to the object color
+                lightColorOut = lightColor;
+            }
+            """
+
+        # fragment shader (deals with the color)
+        self.fragment_shader = """
+            #version 330 core
+             in vec3 objectColor;
+             in vec3 lightColorOut;
+             out vec4 FragColor;
+             void main() {
+                    float ambientStrength = 0.1;
+                    vec3 ambient = ambientStrength * lightColorOut;
+
+                    vec3 result = ambient * objectColor;
+                    FragColor = vec4(result, 1.0);
+             }
+            """
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLShaderDiffuse(GLShaderBase):
+    "support for ambient light"
+    def __init__(self):
+        # vertex shader (deals with the geometric transformations)
+        # this version is a plain color.
+        self.program = None
+        self.vertex_shader = """
+            #version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aNormal;
+
+            out vec3 FragPos;
+            out vec3 Normal;
+
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+
+            void main()
+            {
+                FragPos = vec3(model * vec4(aPos, 1.0));
+                Normal = aNormal;  
+                gl_Position = projection * view * vec4(FragPos, 1.0);
+            }
+            """
+
+        # fragment shader (deals with the color)
+        self.fragment_shader = """
+            #version 330 core
+            out vec4 FragColor;
+
+            in vec3 Normal;  
+            in vec3 FragPos;  
+            
+            uniform vec3 lightPos; 
+            uniform vec3 lightColor;
+            uniform vec3 objectColor;
+
+            void main()
+            {
+                // ambient
+                float ambientStrength = 0.1;
+                vec3 ambient = ambientStrength * lightColor;
+                
+                // diffuse 
+                vec3 norm = normalize(Normal);
+                vec3 lightDir = normalize(lightPos - FragPos);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 diffuse = diff * lightColor;
+                        
+                vec3 result = (ambient + diffuse) * objectColor;
+                FragColor = vec4(result, 1.0);
+            } 
+            """
