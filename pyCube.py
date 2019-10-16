@@ -1,83 +1,48 @@
+#!/usr/bin/env python3
+# ///////////////////////////////////////////////////////////////////////////
+#
+# pyGLLib.py
+# Juan M. Casillas <juanm.casillas@gmail.com>
+#
+# ///////////////////////////////////////////////////////////////////////////
 
-from pyGLlib import GLApp
-from terrain import Terrain
-import numpy as np
+import pyGLLib
 
-class GLAppCube(GLApp):
-    def __init__(self, size, wireframe=False):
-        super().__init__(size,"Terrain Generator", wireframe=wireframe)
-    
-    def load_model(self):
 
-        r = [
-            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
-            0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
-            0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
-            0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
-            -0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
-            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
+class pyCube(pyGLLib.GLApp):
+    def __init__(self, size, title, wireframe=True, grabmouse=True):
+        super().__init__(size, title, wireframe=wireframe, grabmouse=grabmouse )
 
-            -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
-            0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
-            0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
-            0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
-            -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
-            -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
-
-            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
-            -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,
-            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
-
-            0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
-            0.5,  0.5, -0.5,  1.0,  0.0,  0.0,
-            0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
-            0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
-            0.5, -0.5,  0.5,  1.0,  0.0,  0.0,
-            0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
-
-            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
-            0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
-            0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-            0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-            -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
-
-            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
-            0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
-            0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-            0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-            -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
-        ]
-
-        r = np.array(r, dtype=np.float32)
-        r = r.reshape([int(r.size/6),6])
+    def render(self):
+        #self.model_matrix = glm.mat4(1.0)
+        #self.model_matrix = glm.translate(self.model_matrix, (-0.5,0,0))
+        #self.model_matrix = glm.scale(self.model_matrix, glm.vec3(0.5))
         
-        k = [] 
-        for t in r:
-            print(t)
-            x,y,z, i,j,k = t
+        self.shaders["plain"].use()
+        self.shaders["plain"].setMat4(b'model',self.model_matrix)
+        self.shaders["plain"].setMat4(b'view',self.view_matrix)
+        self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
+        self.shaders["plain"].setVec3(b'color',(1.0,0.5,0.5))
+        self.objects["cube"].draw()
 
-                 #coords     #color         #normals
-            k += [ x, y, z,  1.0, 0.0, 0.0,  i, k, j ]
-            i += 1
-        vertexData = np.array(k, np.float32)
-        indexData  = np.array([], np.uint32)
-        triangles   = 0
-       
-        return(vertexData, indexData, triangles)
+    def main(self):
+    
 
+
+        self.init()
+        cube = pyGLLib.object.GLCube()
+        cube.load()
+
+        self.load_shaders()
+        self.load_callbacks()
+        ##self.set_light()
+        ##self.set_objects()
+        self.add_object("cube", cube)
+        self.run()
+        self.cleanup()
 
 if __name__ == "__main__":
 
-    app = GLAppCube( (1024,768), wireframe=False)
-    app.init()
-    app.load_shaders()
-    app.set_light()
-    app.set_gl_buffers()
-    app.load_callbacks()
-    app.run()
-    app.cleanup()
+    app = pyCube( (800,600), "PyGLLib Sample App")
+    app.main()
+    

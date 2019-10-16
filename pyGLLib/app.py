@@ -115,8 +115,8 @@ class GLApp:
         m.load()
         self.objects["ebo"] = m
 
- 
-
+    def add_object(self, name, obj):
+        self.objects[name] = obj
 
     # callback for the window
 
@@ -146,7 +146,10 @@ class GLApp:
         if key == glfw.KEY_D and action in [glfw.PRESS, glfw.REPEAT]:
             self.camera.pos += glm.normalize(glm.cross(self.camera.front, self.camera.up)) * camera_speed
 
-
+        if key == glfw.KEY_Q and action in [glfw.PRESS, glfw.REPEAT]:
+            self.camera.pos += self.camera.up * camera_speed
+        if key == glfw.KEY_Z and action in [glfw.PRESS, glfw.REPEAT]:
+            self.camera.pos -= self.camera.up * camera_speed
 
     def cursor_callback(self,window, xpos, ypos):
         ## print("cursor_callback: xpos: %3.3f, ypos: %3.3f" % (xpos,ypos))
@@ -198,39 +201,17 @@ class GLApp:
             self.camera.delta_time = current_frame - self.camera.last_frame
             self.camera.last_frame = current_frame
 
-
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
             
-
-            #render
-
+        
+            # set view, model and projection matrices
+            self.model_matrix = glm.mat4(1.0)
             self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
             self.view_matrix = glm.lookAt(self.camera.pos, self.camera.pos + self.camera.front, self.camera.up)
 
-            # bind VAO
+            # render the thing.
             try:
-                # to the left
-                self.model_matrix = glm.mat4(1.0)
-                self.model_matrix = glm.translate(self.model_matrix, (-0.5,0,0))
-                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(0.5))
-                
-                self.shaders["plain"].use()
-                self.shaders["plain"].setMat4(b'model',self.model_matrix)
-                self.shaders["plain"].setMat4(b'view',self.view_matrix)
-                self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
-                self.shaders["plain"].setVec3(b'color',(1.0,0.5,0.5))
-                self.objects["base"].draw()
-
-                # to the right
-                self.model_matrix = glm.mat4(1.0)
-                self.model_matrix = glm.translate(self.model_matrix, (0.5,0,0))
-                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(1.1))
-
-                self.shaders["color"].use()
-                self.shaders["color"].setMat4(b'model',self.model_matrix)
-                self.shaders["color"].setMat4(b'view',self.view_matrix)
-                self.shaders["color"].setMat4(b'projection',self.projection_matrix)
-                self.objects["ebo"].draw()
+                self.render()
             finally:
                 # unbind VAO
                 GL.glBindVertexArray(0)
@@ -245,5 +226,38 @@ class GLApp:
 
         glfw.terminate()
 
+    def render(self):
+        # to the left
+        self.model_matrix = glm.mat4(1.0)
+        self.model_matrix = glm.translate(self.model_matrix, (-0.5,0,0))
+        self.model_matrix = glm.scale(self.model_matrix, glm.vec3(0.5))
+        
+        self.shaders["plain"].use()
+        self.shaders["plain"].setMat4(b'model',self.model_matrix)
+        self.shaders["plain"].setMat4(b'view',self.view_matrix)
+        self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
+        self.shaders["plain"].setVec3(b'color',(1.0,0.5,0.5))
+        self.objects["base"].draw()
+
+        # to the right
+        self.model_matrix = glm.mat4(1.0)
+        self.model_matrix = glm.translate(self.model_matrix, (0.5,0,0))
+        self.model_matrix = glm.scale(self.model_matrix, glm.vec3(1.1))
+
+        self.shaders["color"].use()
+        self.shaders["color"].setMat4(b'model',self.model_matrix)
+        self.shaders["color"].setMat4(b'view',self.view_matrix)
+        self.shaders["color"].setMat4(b'projection',self.projection_matrix)
+        self.objects["ebo"].draw()
+
     def cleanup(self):
         glfw.terminate()
+        
+    def main(self):
+        self.init()
+        self.load_shaders()
+        self.load_callbacks()
+        ##self.set_light()
+        self.set_objects()
+        self.run()
+        self.cleanup()
