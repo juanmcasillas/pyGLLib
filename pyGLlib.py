@@ -26,38 +26,32 @@ logging.basicConfig(level=logging.DEBUG)
 
 class GLCamera:
     def __init__(self, size):
-        self.pos =  glm.vec3(0.0,  0.0, 3.0)
-        self.front = glm.vec3(0.0, 0.0, -1.0)
-        self.up = up = glm.vec3(0.0, 1.0, 0.0)
-        self.fov = 45
-        self.speed = 0.05
+        
         self.size = size
         self.width, self.height = self.size
+        self.Defaults()
 
-        self.target = glm.vec3(0.0, 0.0, 0.0)
         self.dir = glm.normalize(self.pos - self.target)
-        self.right = glm.normalize(glm.cross(up, self.dir))
+        self.right = glm.normalize(glm.cross(self.up, self.dir))
         self.up2 = glm.cross(self.dir, self.right)
-        
         self.first_time = True
-        self.last_X = self.width/2.0
-        self.last_Y = self.height/2.0
         self.sensitivity = 0.1
-        self.yaw = -90.0
-        self.pitch = 0.0
+
       # time variables
         self.delta_time = 0.0
         self.last_frame = 0.0
 
-
-    def setPos(self, p): self.pos = p
-    def Pos(self): return(self.pos)
-    
-    def setFront(self, f): self.front = f
-    def Front(self): return(self.front)
-    
-    def setTarget(self, t): self.target = t
-    def Target(self): return(self.target)    
+    def Defaults(self):
+        self.target = glm.vec3(0.0, 0.0, 0.0)
+        self.pos =  glm.vec3(0.0,  0.0, 3.0)
+        self.front = glm.vec3(0.0, 0.0, -1.0)
+        self.up = glm.vec3(0.0, 1.0, 0.0)
+        self.fov = 45
+        self.speed = 0.05
+        self.last_X = self.width/2.0
+        self.last_Y = self.height/2.0
+        self.yaw = -90.0
+        self.pitch = 0.0        
         
 class GLApp:
     def __init__(self,size,title, bgcolor = [0.1,0.1,0.1,0.1], wireframe=False):
@@ -156,7 +150,7 @@ class GLApp:
            GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)  # solid
 
 
-
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
 
     def load_shaders(self, vertex=None, fragment=None):
@@ -276,14 +270,17 @@ class GLApp:
         if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
             glfw.set_window_should_close(window,glfw.TRUE)
 
-        if key == glfw.KEY_W and action == glfw.PRESS:
+        if key == glfw.KEY_ENTER and action == glfw.PRESS:
+            self.camera.Defaults()         
+
+        if key == glfw.KEY_W and action in [glfw.PRESS, glfw.REPEAT]:
             self.camera.pos += camera_speed * self.camera.front
-        if key == glfw.KEY_S and action == glfw.PRESS:
+        if key == glfw.KEY_S and action in [glfw.PRESS, glfw.REPEAT]:
             self.camera.pos -= camera_speed * self.camera.front
 
-        if key == glfw.KEY_A and action == glfw.PRESS:
+        if key == glfw.KEY_A and action in [glfw.PRESS, glfw.REPEAT]:
             self.camera.pos -= glm.normalize(glm.cross(self.camera.front, self.camera.up)) * camera_speed
-        if key == glfw.KEY_D and action == glfw.PRESS:
+        if key == glfw.KEY_D and action in [glfw.PRESS, glfw.REPEAT]:
             self.camera.pos += glm.normalize(glm.cross(self.camera.front, self.camera.up)) * camera_speed
 
 
@@ -381,6 +378,9 @@ class GLApp:
     def cleanup(self):
         glfw.terminate()
 
+
+
+
 if __name__ == "__main__":
 
     app = GLApp( (800,600), "PyGLLib Sample App", wireframe=True)
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     app.load_shaders()
     app.set_gl_buffers()
     app.load_callbacks()
-
     app.run()
-
     app.cleanup()
+
+    
