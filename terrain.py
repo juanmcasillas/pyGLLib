@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import math
+import pyGLLib
 
 class Terrain:
     "terrain oriented in x,z mean Y the height"
@@ -146,18 +147,47 @@ class Terrain:
 
 
 
+class GLTerrain(pyGLLib.object.GLObjectBaseEBO):
+    "Use the EBO object as we have pos,normal in the coords"
+    def __init__(self, size):
+        super().__init__()
+        self.size = size
+        self.width, self.height = self.size
+        self.terrain = Terrain(self.width, self.height)
+
+    def load_model(self):
+        ##self.terrain.fillRandom()
+        W = self.terrain.width-1
+        H = self.terrain.height-1
+        D = max(self.terrain.width,self.terrain.height)
+        r  = []
+   
+        triangles,idx, counter = self.terrain.T()
+        
+        #normals = terrain.calc_normals(np.array(triangles, np.float32), np.array(idx, np.uint32))
+        normals = self.terrain.calc_normals_x(np.array(triangles, np.float32), np.array(idx, np.uint32))
+        i = 0
+        for t in triangles:
+            x = 2 * t[0] / W - 1;
+            y = 2 * t[1] / H - 1;
+            z = 2 * t[2] / D - 1;
+
+            n = normals[i]
+                 #coords    #normals
+            r += [ x, z, y, 1.0, 0.0, 0.0 ]
+            i += 1
+        
+        self.vertexData = np.array(r, np.float32)
+        self.indexData  = np.array(idx, np.uint32)
+        triangles   = counter
+  
 
 
 if __name__ == "__main__":
-
     terrain = Terrain(8,6)
     terrain.set(0,0,1)
     terrain.set(terrain.width-1,0,1)
     terrain.set(terrain.width-1,terrain.height-1,1)
     terrain.set(0,terrain.height-1,1)
     terrain.set(int((terrain.width-1)/2),int((terrain.height-1)/2),1)
-    triangles,idx = terrain.Tesselate()
-    #for i in triangles:
-    #    print(i.vertex[0].pos.x)
-
     terrain.T()

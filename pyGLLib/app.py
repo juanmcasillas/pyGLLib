@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.DEBUG)
 from .camera import GLCamera
 from .shader import GLShaderPlain, GLShaderVertexColor
 from .object import GLObjectBase, GLObjectBaseEBO
+from .light  import GLLight
 
 # ///////////////////////////////////////////////////////////////////////////
 #
@@ -46,7 +47,7 @@ class GLApp:
         self.camera = GLCamera(self.size)
 
         # lights
-        #self.light = GLLight()
+        self.light = GLLight()
 
         # shaders
         self.shaders = {}
@@ -190,6 +191,11 @@ class GLApp:
         if self.camera.fov >= 45.0:
             self.camera.fov = 45.0
 
+    def set_light(self):
+        "override this"
+        self.light.pos = (0.0, 0.0, 0.0)
+        self.light.color = (1.0, 1.0, 1.0)
+
     def run(self):
 
         while not glfw.window_should_close(self.window):
@@ -257,7 +263,7 @@ class GLApp:
         self.init()
         self.load_shaders()
         self.load_callbacks()
-        ##self.set_light()
+        self.set_light()
         self.set_objects()
         self.run()
         self.cleanup()

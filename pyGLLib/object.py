@@ -80,7 +80,7 @@ class GLObjectBaseEBO(GLObjectBase):
     def load_model(self):
 
         vertexData = np.array([
-            # Positions       # Color        
+            # Positions       # Color (or normals)       
             0.5,  0.5, 0.0,   1.0, 0.0, 0.0, # Top Right
             0.5, -0.5, 0.0,   0.0, 1.0, 0.0, # Bottom Right
             -0.5, -0.5, 0.0,  0.0, 0.0, 1.0, # Bottom Left
@@ -135,13 +135,55 @@ class GLObjectBaseEBO(GLObjectBase):
          GL.glDrawElements(GL.GL_TRIANGLES, self.indexData.size, GL.GL_UNSIGNED_INT, None)
 
 
+
 # ///////////////////////////////////////////////////////////////////////////
 #
 #
 #
 # ///////////////////////////////////////////////////////////////////////////
-class GLCube(GLObjectBase):
-    "a cube, built with triangles, and normals. Useful to test light"
+class GLObjectBaseNormal(GLObjectBase):
+    "a cube, built with triangles, and normals. Useful to test light. No EBO"
+    def __init__(self):
+        super().__init__()
+
+    # remember to overload this!
+    def load_model(self):
+        raise RuntimeError("overload this method, please")
+
+    def load(self):
+        super().load()
+        
+        # bind to VAO to add the normals at
+        GL.glBindVertexArray(self.VAO)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.VBO)
+
+        # enable array and set up data - calculating stride length, wow; not documented
+        # 6 -> 3 pos, 3 normal Array(0)->Pos (See Vertex Shader)
+
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
+        GL.glEnableVertexAttribArray(0)
+
+        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
+        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
+        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
+        # Again, 6 -> 3 pos, 3 normal Array(1)->Normals (see Vertex shader)
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
+                        (6 * ctypes.sizeof(_types.GLfloat)), 
+                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
+        GL.glEnableVertexAttribArray(1)
+       
+        # Unbind so we don't mess w/ them
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        GL.glBindVertexArray(0) 
+
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLCube(GLObjectBaseNormal):
+    "a cube, built with triangles, and normals. Useful to test light. No EBO"
     def __init__(self):
         super().__init__()
 
@@ -193,28 +235,32 @@ class GLCube(GLObjectBase):
         self.vertexData = vertexData
         self.triangles = 12 # 2 triangles x 6 faces
 
-    def load(self):
-        super().load()
-        
-        # bind to VAO to add the normals at
-        GL.glBindVertexArray(self.VAO)
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.VBO)
+ # ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLAxis(GLObjectBaseNormal):
+    "axis, draw it with lines, to build the (0,0,0 axis reference. each axis from a color)"
+    def __init__(self):
+        super().__init__()
 
-        # enable array and set up data - calculating stride length, wow; not documented
-        # 6 -> 3 pos, 3 normal Array(0)->Pos (See Vertex Shader)
+    def load_model(self):
+        vertexData = np.array([
+            -10.0,  0.0,  0.0,    1.0,  0.2,  0.2,
+             10.0,  0.0,  0.0,    1.0,  0.2,  0.2, 
 
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
-        GL.glEnableVertexAttribArray(0)
+             0.0,  -10.0,  0.0,    0.2,  1.0,  0.2,
+             0.0,   10.0,  0.0,    0.2,  1.0,  0.2, 
 
-        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
-        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
-        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
-        # Again, 6 -> 3 pos, 3 normal Array(1)->Normals (see Vertex shader)
-        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
-                        (6 * ctypes.sizeof(_types.GLfloat)), 
-                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
-        GL.glEnableVertexAttribArray(1)
-       
-        # Unbind so we don't mess w/ them
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
-        GL.glBindVertexArray(0)             
+             0.0,  0.0,  -10.0,    0.2,  0.2,  1.0,
+             0.0,  0.0,   10.0,    0.2,  0.2,  1.0
+        ], dtype=np.float32)
+
+        self.vertexData = vertexData
+        self.triangles = 6 # no triangles, only lines.
+
+    def draw(self):
+
+         GL.glBindVertexArray(self.VAO)
+         GL.glDrawArrays(GL.GL_LINES, 0, self.vertexData.size)
