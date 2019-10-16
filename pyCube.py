@@ -37,6 +37,9 @@ class pyCube(pyGLLib.GLApp):
         self.light.pos = (0, 1.0, 1.0)
         self.light.color = (1.0,1.0,1.0)
 
+    def set_camera(self):
+        self.camera.pos = ( 3 ,3, 10)  
+
     def render(self):
 
         if not self.diffuse:
@@ -100,6 +103,7 @@ class pyCube(pyGLLib.GLApp):
         self.load_callbacks()
         self.load_shaders()
         self.set_light()
+        self.set_camera()
         ##self.set_objects()
         self.add_object("cube", cube)
         self.add_object("axis", axis)

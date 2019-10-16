@@ -37,6 +37,11 @@ class pyTerrain(pyGLLib.GLApp):
     def set_light(self):
         self.light.pos = (0.0, 1.0, 2.0)
         self.light.color = (1.0,1.0,1.0)
+     
+
+    def set_camera(self):
+        self.camera.pos = (0,5, 15)        
+
 
     def render(self):
 
@@ -88,6 +93,7 @@ class pyTerrain(pyGLLib.GLApp):
         self.load_callbacks()
         self.load_shaders()
         self.set_light()
+        self.set_camera()
         ##self.set_objects()
         self.add_object("terrain", terrain)
         self.add_object("cube", cube)

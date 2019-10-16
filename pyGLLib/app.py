@@ -196,6 +196,9 @@ class GLApp:
         self.light.pos = (0.0, 0.0, 0.0)
         self.light.color = (1.0, 1.0, 1.0)
 
+    def set_camera(self):
+        self.camera.Defaults()
+
     def run(self):
 
         while not glfw.window_should_close(self.window):
@@ -264,6 +267,7 @@ class GLApp:
         self.load_shaders()
         self.load_callbacks()
         self.set_light()
+        self.set_camera()
         self.set_objects()
         self.run()
         self.cleanup()
