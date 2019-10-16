@@ -17,6 +17,7 @@ class GLCamera:
         self.up2 = glm.cross(self.dir, self.right)
         self.first_time = True
         self.sensitivity = 0.1
+  
 
       # time variables
         self.delta_time = 0.0
@@ -28,7 +29,7 @@ class GLCamera:
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.fov = 45
-        self.speed = 0.05
+        self.speed = 25
         self.last_X = self.width/2.0
         self.last_Y = self.height/2.0
         self.yaw = -90.0

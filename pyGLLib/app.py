@@ -128,7 +128,7 @@ class GLApp:
     def key_callback(self,window,key,scancode,action,mods):
 
 
-        camera_speed = 20.5 * self.camera.delta_time
+        camera_speed = self.camera.speed * self.camera.delta_time
 
         if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
             glfw.set_window_should_close(window,glfw.TRUE)

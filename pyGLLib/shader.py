@@ -191,7 +191,7 @@ class GLShaderDiffuse(GLShaderBase):
     "support for ambient light"
     def __init__(self):
         # vertex shader (deals with the geometric transformations)
-        # this version is a plain color.
+        # this version support ambient + diffuse lightning (normals)
         self.program = None
         self.vertex_shader = """
             #version 330 core
