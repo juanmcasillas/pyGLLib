@@ -23,6 +23,222 @@ import cv2
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLObjectBase:
+    def __init__(self):
+        # data model
+        self.vertexData = None
+        self.triangles = None
+        # buffers
+        self.VAO = None  # Vertex Array Object
+        self.VBO = None  # Vertex Buffer Object
+
+    def load_model(self):
+        vertexData = np.array([
+            # first triangle
+            # Positions       # Color     
+             0.5,  0.5, 0.0,  1.0, 0.0, 0.0, # top right
+             0.5, -0.5, 0.0,  0.0, 1.0, 0.0, # bottom right
+            -0.5,  0.5, 0.0,  0.0, 0.0, 1.0, # top left
+            # second triangle
+             0.5, -0.5, 0.0,  0.0, 1.0, 0.0, # bottom right
+            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0, # bottom left
+            -0.5,  0.5, 0.0,  1.0, 1.0, 0.0, # top left
+        ], dtype=np.float32)
+
+        triangles = 2
+        self.vertexData = vertexData
+        self.triangles = triangles
+
+    def load(self):
+
+        self.load_model()
+        self.VAO = GL.glGenVertexArrays(1)
+        GL.glBindVertexArray(self.VAO)
+
+        # Need VBO for triangle vertices
+        self.VBO = GL.glGenBuffers(1)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.VBO)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, self.vertexData.nbytes, self.vertexData, GL.GL_STATIC_DRAW)
+
+        # enable array and set up data - calculating stride length, wow; not documented
+        # 6 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader)
+        # 9 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader), 3 -> 9 normals
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (6 * ctypes.sizeof(_types.GLfloat)), None)
+        GL.glEnableVertexAttribArray(0)
+
+        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
+        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
+        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
+        # Again, 6 -> 3 pos, 3 color Array(1)->Color (see Vertex shader)
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
+                        (6 * ctypes.sizeof(_types.GLfloat)), 
+                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
+        GL.glEnableVertexAttribArray(1)
+
+        # Unbind so we don't mess w/ them
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        GL.glBindVertexArray(0)         
+
+    def draw(self):
+
+         GL.glBindVertexArray(self.VAO)
+         GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.vertexData.size)
+
+class GLObjectBaseEBO(GLObjectBase):
+    def __init__(self):
+        super().__init__()
+
+        #data model
+        self.indexData = None
+
+        #buffer
+        self.EBO = None  # Element Buffer Object (indexes)
+
+    def load_model(self):
+
+        vertexData = np.array([
+            # Positions       # Color        
+            0.5,  0.5, 0.0,   1.0, 0.0, 0.0, # Top Right
+            0.5, -0.5, 0.0,   0.0, 1.0, 0.0, # Bottom Right
+            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0, # Bottom Left
+            -0.5,  0.5, 0.0,  1.0, 1.0, 0.0, # Top Left
+        ], dtype=np.float32)
+
+        indexData = np.array([
+            0, 1, 2, # First Triangle
+            0, 2, 3, # Second Triangle
+        ], dtype=np.uint32)
+
+        triangles = 2
+        self.vertexData = vertexData
+        self.indexData = indexData
+        self.triangles = triangles
+
+    def load(self):
+        super().load()
+        
+        # bind to VAO to add the EBO...
+        GL.glBindVertexArray(self.VAO)
+
+        # Make a EBO buffer here based on indexData
+        self.EBO = GL.glGenBuffers(1)
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.EBO)
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self.indexData.nbytes, self.indexData, GL.GL_STATIC_DRAW)         
+        
+        # Unbind so we don't mess w/ them
+        GL.glBindVertexArray(0)     
+
+    def draw(self):
+         GL.glBindVertexArray(self.VAO)
+         GL.glDrawElements(GL.GL_TRIANGLES, self.indexData.size, GL.GL_UNSIGNED_INT, None)
+
+
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLShaderBase:
+    def __init__(self):
+        # vertex shader (deals with the geometric transformations)
+
+        self.program = None
+        self.vertex_shader = """
+            #version 330 core
+            layout(location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 color;     // color variable has attribute position 1
+    
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+            
+            out vec3 ourColor;    // color output to fragment shader
+    
+            void main() {
+            // transform vertex
+                gl_Position = projection * view * model * vec4(aPos, 1.0); 
+                ourColor = color; // Set the color to the input color from the vertex data
+            }
+            """
+
+        # fragment shader (deals with the color)
+        self.fragment_shader = """
+            #version 330 core
+             in vec3 ourColor;
+             out vec4 FragColor;
+             void main() {
+                 FragColor = vec4(ourColor, 1.0f);
+             }
+            """
+
+    def load(self, vertex=None, fragment=None):
+
+        vertex_s   = vertex or self.vertex_shader
+        fragment_s = fragment or self.fragment_shader
+
+        vertexShader   = shaders.compileShader(vertex_s,   GL.GL_VERTEX_SHADER)
+        fragmentShader = shaders.compileShader(fragment_s, GL.GL_FRAGMENT_SHADER)
+        
+        self.program = GL.glCreateProgram()
+        if not self.program:
+            raise RunTimeError('glCreateProgram faled!')
+
+        # attach shaders
+        GL.glAttachShader(self.program, vertexShader)
+        GL.glAttachShader(self.program, fragmentShader)
+
+        # Link the program
+        GL.glLinkProgram(self.program)
+
+        # check if ok.
+        linked = GL.glGetProgramiv(self.program, GL.GL_LINK_STATUS)
+        if not linked:
+            infoLen = GL.glGetProgramiv(self.program, GL.GL_INFO_LOG_LENGTH)
+            infoLog = ""
+            if infoLen > 1:
+                infoLog = GL.glGetProgramInfoLog(self.program, infoLen, None);
+            GL.glDeleteProgram(self.program)
+            raise RunTimeError("Error linking program:\n%s\n", infoLog);
+
+        GL.glDeleteShader(vertexShader)
+        GL.glDeleteShader(fragmentShader)
+
+    def use(self):
+        GL.glUseProgram(self.program)
+
+    def setMat4(self, name,  matrix):
+         GL.glUniformMatrix4fv(GL.glGetUniformLocation(self.program, name),  
+                               1, 
+                               GL.GL_FALSE, 
+                               glm.value_ptr(matrix)
+                               )
+    
+    def setVec3(self, name, vec):
+        GL.glUniform3fv(GL.glGetUniformLocation(self.program, name),  
+                        1, 
+                        list(vec))
+        
+
+
+
+class GLShaderColor(GLShaderBase):
+    "the default shader, supports basic color from vertex"
+    def __init__(self):
+        super().__init__()
+
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
 class GLLight:
     def __init__(self):
         self.pos = glm.vec3(0, 0.5, 3.0)
@@ -33,6 +249,11 @@ class GLLight:
         self.object_id = None
 
 
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
 class GLCamera:
     def __init__(self, size):
         
@@ -61,95 +282,39 @@ class GLCamera:
         self.last_Y = self.height/2.0
         self.yaw = -90.0
         self.pitch = 0.0        
-        
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+#
+#
+# ///////////////////////////////////////////////////////////////////////////
 class GLApp:
-    def __init__(self,size,title, bgcolor = [0.1,0.1,0.1,0.1], wireframe=False):
+    def __init__(self,size,title, bgcolor = [0.1,0.1,0.1,0.1], wireframe=False, grabmouse=False):
         self.size=size
         self.width, self.height = self.size
         self.aspect = self.width/(float(self.height))
         self.title=title
         self.bgcolor = bgcolor
         self.wireframe = wireframe
+        self.grabmouse = grabmouse
 
         # gl stuff
         self.window = None
-        self.shaderProgram = None
         self.model_matrix = None
         self.view_matrix = None
         self.projection_matrix = None
-        self.model_matrix_id = None
-        self.view_matrix_id = None
-        self.projection_matrix_id = None
-
-        # buffers
-        self.VAO = None  # Vertex Array Object
-        self.VBO = None  # Vertex Buffer Object
-        self.EBO = None  # Element Buffer Object (indexes)
-
-        # data model
-        self.vertexData = None
-        self.indexData = None
-        self.triangles = None
 
         # cameras
         self.camera = GLCamera(self.size)
 
         # lights
-        self.light = GLLight()
+        #self.light = GLLight()
 
-  
-        # vertex shader (deals with the geometric transformations)
-        self.vertex_shader = """
-            #version 330 core
-            layout(location = 0) in vec3 aPos;
-            layout (location = 1) in vec3 color;     // color variable has attribute position 1
-            layout (location = 2) in vec3 normal;    // normal vector is in 2
-            uniform mat4 model;
-            uniform mat4 view;
-            uniform mat4 projection;
-            
-            out vec3 ourColor;    // color output to fragment shader
-            out vec3 ourNormal;   // the normal value to the fragment
-            out vec3 FragPos;
+        # shaders
+        self.shaders = {}
 
-            void main() {
-            // transform vertex
-                FragPos = vec3(model * vec4(aPos, 1.0));
-                ourNormal = normal;
-                gl_Position = projection * view * vec4(FragPos, 1.0); 
-                ourColor = color; // Set the color to the input color from the vertex data
-            }
-            """
-
-        # fragment shader (deals with the color. in this case, full red.)
-        self.fragment_shader = """
-            #version 330 core
-            in vec3 ourColor;
-            in vec3 ourNormal; 
-            in vec3 FragPos;   
-            out vec4 FragColor;
-
-            uniform vec3 lightPos; 
-            uniform vec3 lightColor; 
-            uniform vec3 objectColor; 
-
-            void main() {
-                
-
-                float ambientStrength = 0.3;
-                vec3 ambient = ambientStrength * lightColor;
-                
-                // diffuse 
-                vec3 norm = normalize(ourNormal);
-                vec3 lightDir = normalize(lightPos - FragPos);
-                float diff = max(dot(norm, lightDir), 0.0);
-                vec3 diffuse = diff * lightColor;
-                        
-                vec3 result = (ambient + diffuse) * objectColor;
-                FragColor = vec4(result, 1.0);
-                //FragColor = vec4(ourColor, 1.0f);
-            }
-            """
+        # objects
+        self.objects = {}
 
 
     def init(self):
@@ -185,121 +350,28 @@ class GLApp:
         else:
            GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)  # solid
 
-
-        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
-
-
-    def load_shaders(self, vertex=None, fragment=None):
-
-        vertex_s   = vertex or self.vertex_shader
-        fragment_s = fragment or self.fragment_shader
-
-        vertexShader   = shaders.compileShader(vertex_s,   GL.GL_VERTEX_SHADER)
-        fragmentShader = shaders.compileShader(fragment_s, GL.GL_FRAGMENT_SHADER)
-        
-        self.shaderProgram = GL.glCreateProgram()
-        if not self.shaderProgram:
-            raise RunTimeError('glCreateProgram faled!')
-
-        # attach shaders
-        GL.glAttachShader(self.shaderProgram, vertexShader)
-        GL.glAttachShader(self.shaderProgram, fragmentShader)
-
-        # Link the program
-        GL.glLinkProgram(self.shaderProgram)
-
-        # check if ok.
-        linked = GL.glGetProgramiv(self.shaderProgram, GL.GL_LINK_STATUS)
-        if not linked:
-            infoLen = GL.glGetProgramiv(self.shaderProgram, GL.GL_INFO_LOG_LENGTH)
-            infoLog = ""
-            if infoLen > 1:
-                infoLog = GL.glGetProgramInfoLog(self.shaderProgram, infoLen, None);
-            GL.glDeleteProgram(self.shaderProgram)
-            raise RunTimeError("Error linking program:\n%s\n", infoLog);
-
-        GL.glDeleteShader(vertexShader)
-        GL.glDeleteShader(fragmentShader)
+        if self.grabmouse:
+            glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
 
-    def set_gl_buffers(self):
-        GL.glUseProgram(self.shaderProgram)
-        self.model_matrix_id      = GL.glGetUniformLocation(self.shaderProgram,  b'model')
-        self.view_matrix_id       = GL.glGetUniformLocation(self.shaderProgram,  b'view')
-        self.projection_matrix_id = GL.glGetUniformLocation(self.shaderProgram,  b'projection')
+    def load_shaders(self):
+        # set thte default shader.
+        s = GLShaderColor()
+        s.load()
+        self.shaders["default"] = s
 
 
-        # ///////////////////////////////////////////////////////////////////////////
-        #
-        #  load here the data!
-        # 
-        self.vertexData,self.indexData,self.triangles = self.load_model()       
-        #
-        # ///////////////////////////////////////////////////////////////////////////
+    def set_objects(self):
 
-        self.VAO = GL.glGenVertexArrays(1)
-        GL.glBindVertexArray(self.VAO)
+        m = GLObjectBase()
+        m.load()
+        self.objects["base"] = m
 
-        # Need VBO for triangle vertices
-        self.VBO = GL.glGenBuffers(1)
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.VBO)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, self.vertexData.nbytes, self.vertexData, GL.GL_STATIC_DRAW)
+        m = GLObjectBaseEBO()
+        m.load()
+        self.objects["ebo"] = m
 
-        # We make an EBO now
-        self.EBO = GL.glGenBuffers(1)
-        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.EBO)
-        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, self.indexData.nbytes, self.indexData, GL.GL_STATIC_DRAW)
-
-        # enable array and set up data - calculating stride length, wow; not documented
-        # 6 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader)
-        # 9 -> 3 pos, 3 color Array(0)->Pos (See Vertex Shader), 3 -> 9 normals
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, (9 * ctypes.sizeof(_types.GLfloat)), None)
-        GL.glEnableVertexAttribArray(0)
-
-        # I like how offsets aren't documented either; http://pyopengl.sourceforge.net/documentation/manual-3.0/glVertexAttribPointer.html
-        # offsets https://twistedpairdevelopment.wordpress.com/2013/02/16/using-array_buffers-in-pyopengl/
-        # http://stackoverflow.com/questions/11132716/how-to-specify-buffer-offset-with-pyopengl
-        # Again, 6 -> 3 pos, 3 color Array(1)->Color (see Vertex shader)
-        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, 
-                        (9 * ctypes.sizeof(_types.GLfloat)), 
-                        ctypes.c_void_p((3 * ctypes.sizeof(_types.GLfloat))))
-        GL.glEnableVertexAttribArray(1)
-
-        GL.glVertexAttribPointer(2, 3, GL.GL_FLOAT, GL.GL_FALSE, 
-                        (9 * ctypes.sizeof(_types.GLfloat)), 
-                        ctypes.c_void_p((6 * ctypes.sizeof(_types.GLfloat))))
-        GL.glEnableVertexAttribArray(1)
-
-        # Unbind so we don't mess w/ them
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
-        GL.glBindVertexArray(0) 
-
-    def set_light(self):
-        self.light.pos_id = GL.glGetUniformLocation(self.shaderProgram,  b'lightPos')
-        self.light.color_id = GL.glGetUniformLocation(self.shaderProgram,  b'lightColor')
-        self.light.object_id = GL.glGetUniformLocation(self.shaderProgram,  b'objectColor')
-
-    def load_model(self):
-        vertexData = np.array([
-            # Positions       # Color
-            0.5,  0.5, 0.0,   1.0, 0.0, 0.0, # Top Right
-            0.5, -0.5, 0.0,   0.0, 1.0, 0.0, # Bottom Right
-            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0, # Bottom Left
-            -0.5,  0.5, 0.0,  1.0, 1.0, 0.0, # Top Left
-        ], dtype=np.float32)
-
-        indexData = np.array([
-            0, 1, 2, # First Triangle
-            0, 2, 3, # Second Triangle
-        ], dtype=np.uint32)
-
-        triangles = 2
-        #return ( 
-        #    np.array(vertex, np.float32),
-        #    np.array(index , np.uint32),
-        #    triangles
-        #)    
-        return(vertexData, indexData, triangles)
+ 
 
 
     # callback for the window
@@ -384,38 +456,22 @@ class GLApp:
 
 
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-
-            def Mat2NP(mat):
-                return np.array( list(map(lambda x: list(x), list(mat))), dtype=np.float32 )
-
-            def Vec3toNP(mat):
-                return np.array( list(map(lambda x: list(x), list(mat))), dtype=np.float32 )
-
-            self.model_matrix = glm.mat4(1.0)
-            self.view_matrix = glm.mat4(1.0)
-            self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
             
+            #self.view_matrix = glm.mat4(1.0)
+            self.model_matrix = glm.mat4(1.0)
+            self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
             self.view_matrix = glm.lookAt(self.camera.pos, self.camera.pos + self.camera.front, self.camera.up)
 
             #render
-            GL.glUseProgram(self.shaderProgram)
-
-            GL.glUniformMatrix4fv(self.model_matrix_id,      1, GL.GL_FALSE, glm.value_ptr(self.model_matrix))
-            GL.glUniformMatrix4fv(self.view_matrix_id,       1, GL.GL_FALSE, glm.value_ptr(self.view_matrix))
-            GL.glUniformMatrix4fv(self.projection_matrix_id, 1, GL.GL_FALSE, glm.value_ptr(self.projection_matrix))
-            GL.glUniform3fv(self.light.pos_id,  1, list(self.light.pos))
-            GL.glUniform3fv(self.light.color_id,  1, list(self.light.color))
-            GL.glUniform3fv(self.light.object_id,  1, list(self.light.object))
-
-
+            self.shaders["default"].use()
+            self.shaders["default"].setMat4(b'model',self.model_matrix)
+            self.shaders["default"].setMat4(b'view',self.view_matrix)
+            self.shaders["default"].setMat4(b'projection',self.projection_matrix)
 
             # bind VAO
             try:
-                GL.glBindVertexArray(self.VAO)
-                # draw vertex
-                #GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.vertexData.size) # 6 -> 2
-                # draw indices
-                GL.glDrawElements(GL.GL_TRIANGLES, self.indexData.size, GL.GL_UNSIGNED_INT, None)
+                #self.objects["base"].draw()
+                self.objects["ebo"].draw()
             finally:
                 # unbind VAO
                 GL.glBindVertexArray(0)
@@ -438,12 +494,13 @@ class GLApp:
 
 if __name__ == "__main__":
 
-    app = GLApp( (800,600), "PyGLLib Sample App", wireframe=True)
+    app = GLApp( (800,600), "PyGLLib Sample App", wireframe=True, grabmouse=True)
     app.init()
     app.load_shaders()
-    app.set_light()
-    app.set_gl_buffers()
     app.load_callbacks()
+    
+    ##app.set_light()
+    app.set_objects()
     app.run()
     app.cleanup()
 
