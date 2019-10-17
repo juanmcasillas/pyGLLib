@@ -61,6 +61,10 @@ class pyTerrain(pyGLLib.GLApp):
             shader = "diffuse"
         else:
             shader = "ambient"
+
+        self.model_matrix = glm.mat4(1.0)
+        self.model_matrix = glm.scale(self.model_matrix, glm.vec3(10.0))
+        
         self.shaders[shader].use()
         self.shaders[shader].setMat4(b'model',self.model_matrix)
         self.shaders[shader].setMat4(b'view',self.view_matrix)
@@ -74,14 +78,16 @@ class pyTerrain(pyGLLib.GLApp):
         self.shaders[shader].setFloat(b'light.linear',self.light.linear)
         self.shaders[shader].setFloat(b'light.quadratic',self.light.quadratic)
         #self.objects["terrain"].draw()
-        
+
+        self.objects["road"].draw()
+
         self.model_matrix = glm.mat4(1.0)    
         self.shaders["plain"].use()
         self.shaders["plain"].setMat4(b'model',self.model_matrix)
         self.shaders["plain"].setMat4(b'view',self.view_matrix)
         self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
         self.shaders["plain"].setVec3(b'color',(0.8,1.0,1.0))
-        self.objects["road"].draw()
+        
     
         
         
@@ -114,7 +120,7 @@ class pyTerrain(pyGLLib.GLApp):
         terrain = GLTerrain(self.tsize, points)
         terrain.load()
 
-        road = GLRoad("track.GPX")
+        road = GLRoad("run2.GPX")
         road.load()
 
         cube = pyGLLib.object.GLCube()

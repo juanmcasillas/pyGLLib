@@ -16,7 +16,7 @@ import numpy as np
 import os
 import math
 import pyGLLib
-
+np.set_printoptions(precision=4, floatmode="fixed", suppress=True)
 
 def test_gpx(fname):
 
@@ -213,7 +213,7 @@ class BoundingBox(object):
             # sighly open the range to avoid bad interpolation of decimals
             # due precision           
             #
-            print(points)
+            #print(points)
             D = 0.1
             x = np.interp(points[:,[0]], (self.minx-D, self.maxx+D), interp[0])
             y = np.interp(points[:,[1]], (self.miny-D, self.maxy+D), interp[1])
@@ -253,7 +253,9 @@ class BoundingBox(object):
     @property
     def center(self):
         """(x,y) center point of the bounding box"""
-        return (self.minx + self.width / 2, self.miny + self.height / 2, 0.0)
+        # minz to offset the heights to 0
+        mz = (self.maxz-self.minz)/2
+        return (self.minx + self.width / 2, self.miny + self.height / 2, mz)
 
     @property
     def max_dim(self):
@@ -283,6 +285,38 @@ def V_U(U):
     U = U/module  
     return U  
 
+def calc_normal_from_triangle(triangle):
+    
+    normals = [0.0]*3
+    Q,R,S = triangle
+    #print(t, "->", Q,R,S)
+
+    #first vertex
+    QR = R-Q
+    QS = S-Q
+    normals[0] =  V_U(list(np.cross(QR,QS))).flatten()
+
+    #second vertex
+    RS = S-R
+    RQ = Q-R
+    normals[1] = V_U(list(np.cross(RS,RQ))).flatten()
+
+    #third vertex
+    SQ = Q-S
+    SR = R-S
+    normals[2] = V_U(list(np.cross(SQ,SR))).flatten()
+    return normals   
+
+def remove_duplicates(points):
+    #https://stackoverflow.com/questions/39541276/take-unique-of-numpy-array-according-to-2-column-values
+    #shape the points to array
+    "remove duplicate rows"
+    dt = points.dtype.descr * points.shape[1]    
+    points_view = points.view(dt)
+    points_uniq, points_idx = np.unique(points_view, return_index=True)
+    points = points[points_idx]
+    return(points)
+
 class RoadGenerator(object):
     def __init__(self, points):
         # build a [len,3] matrix
@@ -290,7 +324,8 @@ class RoadGenerator(object):
         self.bb = BoundingBox()
         self.points = self.bb.calculate(points, offset=True)
         self.points = np.array(self.points).reshape(int(len(self.points)/3),3)
-    
+        self.points = remove_duplicates(self.points)
+
     def normalize(self, points):
         bb = BoundingBox()
         points = bb.calculate(points, interp=self.interp_range, normals=True)
@@ -309,25 +344,22 @@ class RoadGenerator(object):
                 Q = self.points[i+1]
             
             # remove the height for now (Z)
-            P[2] = Q[2] = 0.0
+            #P[2] = Q[2] = 0.0
             
             PQ = Q-P
+   
             #PQ_U = V_U(PQ)
             # this is the NORMAL vector 
             #T1 = np.array(( -PQ[1], 0.0, PQ[0])) * distance
             #T2 = np.array(( PQ[1], 0.0, -PQ[0])) * distance
-            T1 = np.array(( -PQ[1], PQ[0], 0.0)) * distance
-            T2 = np.array(( PQ[1], -PQ[0], 0.0)) * distance            
-            # rotate 90!
-            # x' = -(y - py) + px 
-            # y' = (x - px) + py   
-            #T1 = np.array( (-(PQ[2]-P[2]) + P[0], (P[0] -PQ[0]) + PQ[2], 0.0) )
-            #T2 = np.array( ((PQ[2]-P[2]) - P[0], -(P[0] -PQ[0]) - PQ[2], 0.0) )
+            T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), 0.0))) * distance
+            T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), 0.0))) * distance            
+  
 
             T1 = P + T1 
             T2 = P + T2 
-            vertex += [ T2, P, T1]
-            
+            vertex += [ T1, P, T2]
+ 
         return vertex
         
     def build(self, distance):
@@ -341,53 +373,38 @@ class RoadGenerator(object):
         i=0
         # skip last polygon.
         while i < len(quads)-5:
-            Q = quads[i]
-            R = quads[i+2]
+            #print(i, triangles)
+            #print(quads)
+            Q = quads[i+2]
+            R = quads[i]
             S = quads[i+5]
-            nQ,nS,nR = self.calc_normal_from_triangle((Q,S,R))
+            nQ,nS,nR = calc_normal_from_triangle((Q,S,R))
             triangles += [ Q,nQ, R, nR, S,nS ]
            
-            S = quads[i+5]
-            R = quads[i+2]
-            Q = quads[i+3]
-            nQ,nS,nR  = self.calc_normal_from_triangle((Q,S,R))
+            Q = quads[i+5]
+            R = quads[i]
+            S = quads[i+3]
+            nQ,nS,nR  = calc_normal_from_triangle((Q,S,R))
             triangles += [ Q,nQ, S,nS, R, nR ]
 
-
-            i = i+6
+            i = i+3
+    
 
       
         x = np.array(triangles).flatten()
         x = np.array(x).reshape(int(len(x)/6),6)
     
-        #x = self.normalize(x)
+        
 
         # swap Y by Z (data and normals)
-        #x.T[[1, 2]] = x.T[[2, 1]]
-        #x.T[[4, 5]] = x.T[[5, 4]]
+        x.T[[1, 2]] = x.T[[2, 1]]
+        x.T[[4, 5]] = x.T[[5, 4]]
+        
+        x = self.normalize(x)    
+
         return np.array(x.flatten(),dtype=np.float32)
 
-    def calc_normal_from_triangle(self, triangle):
-        
-        normals = [0.0]*3
-        Q,R,S = triangle
-        #print(t, "->", Q,R,S)
-
-        #first vertex
-        QR = R-Q
-        QS = S-Q
-        normals[0] =  V_U(list(np.cross(QR,QS))).flatten()
-
-        #second vertex
-        RS = S-R
-        RQ = Q-R
-        normals[1] = V_U(list(np.cross(RS,RQ))).flatten()
-
-        #third vertex
-        SQ = Q-S
-        SR = R-S
-        normals[2] = V_U(list(np.cross(SQ,SR))).flatten()
-        return normals    
+ 
 
 # ///////////////////////////////////////////////////////////////////////////
 #
@@ -405,7 +422,7 @@ def draw(points):
 
 class GLRoad(pyGLLib.object.GLObjectBaseNormal):
     
-    def __init__(self, fname, distance=0.5):
+    def __init__(self, fname, distance=5):
         super().__init__()
         self.fname = fname
         self.distance = distance
@@ -414,19 +431,26 @@ class GLRoad(pyGLLib.object.GLObjectBaseNormal):
         loader = GPXLoader(self.fname)
         points = loader.load() 
 
-        points = [
-            -0.5, 0.0, 0.0,
-             0.5, 0.0, 0.0
-        ]
+        # points = [
+        #      -0.4, 0.0, -0.4,
+        #       0.0, 0.0, 0.0,
+        #       0.4, 0.0, 0.4, ##dup!
+        #       0.4, 0.0, 0.4
+        #  ]
+        # points = np.array(points).reshape(4,3)
 
+
+        
         roadgen = RoadGenerator(points)
         self.vertexData = roadgen.build(self.distance)
 
-        print(np.array(self.vertexData).reshape(int(len(self.vertexData)/6),6))
+        #print(np.array(self.vertexData).reshape(int(len(self.vertexData)/6),6))
 
         #self.vertexData = self.vertexData[0:6*3]
-        #self.vertexData = self.vertexData[6*3:]
-        self.triangles = len(self.vertexData)/(3*6)
+        #self.vertexData = self.vertexData[6*3:6*3*2]
+        #self.vertexData = self.vertexData[6*3*2:6*3*3]
+        #self.vertexData = self.vertexData[6*3*3:]
+        #self.triangles = len(self.vertexData)/(3*6)
 
         # self.vertexData = np.array([
         #     -0.5,  0.5,  0.,   0.,   0.,  -1., 
