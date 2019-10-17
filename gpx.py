@@ -157,7 +157,7 @@ class BoundingBox(object):
     def __init__(self):
         pass
 
-    def calculate(self, points, offset=False, interp=None):
+    def calculate(self, points, offset=False, interp=None, normals=False):
         """
         Compute the upright 2D bounding box for a set of
         2D coordinates in a (n,3) numpy array.
@@ -170,7 +170,7 @@ class BoundingBox(object):
                 points = np.array(points).reshape(int(len(points)/3) ,3)
             else:
                 points = np.array(points).reshape(int(len(points)/6) ,6)
-       
+
         self.minx = np.min(points[:,[0]]) # X
         self.maxx = np.max(points[:,[0]]) # X
         
@@ -183,10 +183,10 @@ class BoundingBox(object):
         # offset the data to 0 (top, left)
         if offset:
             if normals:
-                x,y,z = self.coords[0]
+                x,y,z = self.center
                 points = points - [ x, y, z, 0.0, 0.0, 0.0]
             else:
-                points = points - self.coords[0]
+                points = points - self.center
 
             self.minx_o = self.minx
             self.maxx_o = self.maxx
@@ -209,11 +209,11 @@ class BoundingBox(object):
         
         # interpolate the data to the new space
         if interp is not None:
-
             #
             # sighly open the range to avoid bad interpolation of decimals
             # due precision           
             #
+            print(points)
             D = 0.1
             x = np.interp(points[:,[0]], (self.minx-D, self.maxx+D), interp[0])
             y = np.interp(points[:,[1]], (self.miny-D, self.maxy+D), interp[1])
@@ -253,7 +253,7 @@ class BoundingBox(object):
     @property
     def center(self):
         """(x,y) center point of the bounding box"""
-        return (self.minx + self.width / 2, self.miny + self.height / 2)
+        return (self.minx + self.width / 2, self.miny + self.height / 2, 0.0)
 
     @property
     def max_dim(self):
@@ -286,11 +286,16 @@ def V_U(U):
 class RoadGenerator(object):
     def __init__(self, points):
         # build a [len,3] matrix
-        
+        self.interp_range = ( (-1,1), (-1,1), (-1,1) )
         self.bb = BoundingBox()
-        self.points = self.bb.calculate(points, offset=True, interp=((-1,1), (-1,1), (-1,1)))
+        self.points = self.bb.calculate(points, offset=True)
         self.points = np.array(self.points).reshape(int(len(self.points)/3),3)
     
+    def normalize(self, points):
+        bb = BoundingBox()
+        points = bb.calculate(points, interp=self.interp_range, normals=True)
+        return(points)
+
     def add_perpendicular(self, distance):
         i = 0
         vertex = []
@@ -303,17 +308,25 @@ class RoadGenerator(object):
                 P = self.points[i]
                 Q = self.points[i+1]
             
-            # remove the height for now
+            # remove the height for now (Z)
             P[2] = Q[2] = 0.0
             
             PQ = Q-P
             #PQ_U = V_U(PQ)
-            T1 = np.array(( -PQ[1], PQ[0], 0)) * distance
-            T2 = np.array(( PQ[1], -PQ[0], 0)) * distance
-            
+            # this is the NORMAL vector 
+            #T1 = np.array(( -PQ[1], 0.0, PQ[0])) * distance
+            #T2 = np.array(( PQ[1], 0.0, -PQ[0])) * distance
+            T1 = np.array(( -PQ[1], PQ[0], 0.0)) * distance
+            T2 = np.array(( PQ[1], -PQ[0], 0.0)) * distance            
+            # rotate 90!
+            # x' = -(y - py) + px 
+            # y' = (x - px) + py   
+            #T1 = np.array( (-(PQ[2]-P[2]) + P[0], (P[0] -PQ[0]) + PQ[2], 0.0) )
+            #T2 = np.array( ((PQ[2]-P[2]) - P[0], -(P[0] -PQ[0]) - PQ[2], 0.0) )
+
             T1 = P + T1 
             T2 = P + T2 
-            vertex += [ T1, P, T2]
+            vertex += [ T2, P, T1]
             
         return vertex
         
@@ -324,34 +337,35 @@ class RoadGenerator(object):
         
         triangles = []
         quads = self.add_perpendicular(distance)
+ 
         i=0
         # skip last polygon.
-      
         while i < len(quads)-5:
             Q = quads[i]
             R = quads[i+2]
-            S = quads[i+3]
-            Normals = self.calc_normal_from_triangle((Q,S,R))
-            triangles += [ Q,S,R ]
-            triangles += Normals
-            
-            S = quads[i+2]
-            R = quads[i+3]
-            Q = quads[i+4]
-            Normals = self.calc_normal_from_triangle((Q,S,R))
-            triangles += [ Q,S,R ]
-            triangles += Normals
+            S = quads[i+5]
+            nQ,nS,nR = self.calc_normal_from_triangle((Q,S,R))
+            triangles += [ Q,nQ, R, nR, S,nS ]
+           
+            S = quads[i+5]
+            R = quads[i+2]
+            Q = quads[i+3]
+            nQ,nS,nR  = self.calc_normal_from_triangle((Q,S,R))
+            triangles += [ Q,nQ, S,nS, R, nR ]
 
-            i = i+3
 
+            i = i+6
+
+      
         x = np.array(triangles).flatten()
         x = np.array(x).reshape(int(len(x)/6),6)
-        # swap Y by Z (data and normals)
-        x.T[[1, 2]] = x.T[[2, 1]]
-        x.T[[4, 5]] = x.T[[5, 4]]
+    
+        #x = self.normalize(x)
 
-        x = self.bb.calculate(x, offset=True, interp=((-1,1), (-1,1), (-1,1)), normals=True)
-        return(np.array(x).flatten())
+        # swap Y by Z (data and normals)
+        #x.T[[1, 2]] = x.T[[2, 1]]
+        #x.T[[4, 5]] = x.T[[5, 4]]
+        return np.array(x.flatten(),dtype=np.float32)
 
     def calc_normal_from_triangle(self, triangle):
         
@@ -362,17 +376,17 @@ class RoadGenerator(object):
         #first vertex
         QR = R-Q
         QS = S-Q
-        normals[0] =  V_U(list(np.cross(QR,QS)))
+        normals[0] =  V_U(list(np.cross(QR,QS))).flatten()
 
         #second vertex
         RS = S-R
         RQ = Q-R
-        normals[1] = V_U(list(np.cross(RS,RQ)))
+        normals[1] = V_U(list(np.cross(RS,RQ))).flatten()
 
         #third vertex
         SQ = Q-S
         SR = R-S
-        normals[2] = V_U(list(np.cross(SQ,SR)))
+        normals[2] = V_U(list(np.cross(SQ,SR))).flatten()
         return normals    
 
 # ///////////////////////////////////////////////////////////////////////////
@@ -391,7 +405,7 @@ def draw(points):
 
 class GLRoad(pyGLLib.object.GLObjectBaseNormal):
     
-    def __init__(self, fname, distance=1):
+    def __init__(self, fname, distance=0.5):
         super().__init__()
         self.fname = fname
         self.distance = distance
@@ -399,10 +413,31 @@ class GLRoad(pyGLLib.object.GLObjectBaseNormal):
     def load_model(self):
         loader = GPXLoader(self.fname)
         points = loader.load() 
+
+        points = [
+            -0.5, 0.0, 0.0,
+             0.5, 0.0, 0.0
+        ]
+
         roadgen = RoadGenerator(points)
         self.vertexData = roadgen.build(self.distance)
-        self.triangles = len(self.vertexData)/(3*6)
+
         print(np.array(self.vertexData).reshape(int(len(self.vertexData)/6),6))
+
+        #self.vertexData = self.vertexData[0:6*3]
+        #self.vertexData = self.vertexData[6*3:]
+        self.triangles = len(self.vertexData)/(3*6)
+
+        # self.vertexData = np.array([
+        #     -0.5,  0.5,  0.,   0.,   0.,  -1., 
+        #     -0.5, -0.5,  0.,   0.,   0.,  -1., 
+        #      0.5, -0.5,  0.,   0.,   0.,  -1., 
+        #      0.5, -0.5,  0.,   0.,  -0.,   1., 
+        #      0.5,  0.5,  0.,   0.,   0.,   1., 
+        #     -0.5, -0.5,  0.,   0.,   0.,   1., 
+        # ],dtype=np.float32)
+    
+        
  
 
 if __name__ == "__main__":

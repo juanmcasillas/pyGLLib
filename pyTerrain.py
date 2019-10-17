@@ -74,9 +74,15 @@ class pyTerrain(pyGLLib.GLApp):
         self.shaders[shader].setFloat(b'light.linear',self.light.linear)
         self.shaders[shader].setFloat(b'light.quadratic',self.light.quadratic)
         #self.objects["terrain"].draw()
+        
+        self.model_matrix = glm.mat4(1.0)    
+        self.shaders["plain"].use()
+        self.shaders["plain"].setMat4(b'model',self.model_matrix)
+        self.shaders["plain"].setMat4(b'view',self.view_matrix)
+        self.shaders["plain"].setMat4(b'projection',self.projection_matrix)
+        self.shaders["plain"].setVec3(b'color',(0.8,1.0,1.0))
         self.objects["road"].draw()
-
-        # move the light in the Z plane.
+    
         
         
         a,b,c = self.light.pos
@@ -130,7 +136,7 @@ class pyTerrain(pyGLLib.GLApp):
 
 if __name__ == "__main__":
 
-    app = pyTerrain( (800,600), (30,30), "pyTerrain Sample App", shadows=False, wireframe=False)
+    app = pyTerrain( (800,600), (30,30), "pyTerrain Sample App", shadows=False, wireframe=True)
     app.main()
     
 
