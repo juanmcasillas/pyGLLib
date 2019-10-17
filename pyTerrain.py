@@ -11,8 +11,9 @@ import pyGLLib
 import glm
 import sys
 import numpy as np
-from read_gpx import map_gpx
 import math
+
+from gpx import GLRoad
 
 class pyTerrain(pyGLLib.GLApp):
     def __init__(self, size, tsize, title, wireframe=False, grabmouse=True, shadows=False):
@@ -72,8 +73,8 @@ class pyTerrain(pyGLLib.GLApp):
         self.shaders[shader].setFloat(b'light.constant',self.light.constant)
         self.shaders[shader].setFloat(b'light.linear',self.light.linear)
         self.shaders[shader].setFloat(b'light.quadratic',self.light.quadratic)
-        self.objects["terrain"].draw()
-
+        #self.objects["terrain"].draw()
+        self.objects["road"].draw()
 
         # move the light in the Z plane.
         
@@ -106,6 +107,10 @@ class pyTerrain(pyGLLib.GLApp):
         # all gl calls must be done AFTER init() or doesn't work
         terrain = GLTerrain(self.tsize, points)
         terrain.load()
+
+        road = GLRoad("track.GPX")
+        road.load()
+
         cube = pyGLLib.object.GLCube()
         cube.load()
         axis = pyGLLib.object.GLAxis()
@@ -117,6 +122,7 @@ class pyTerrain(pyGLLib.GLApp):
         self.set_camera()
         ##self.set_objects()
         self.add_object("terrain", terrain)
+        self.add_object("road", road)
         self.add_object("cube", cube)
         self.add_object("axis", axis)
         self.run()
@@ -124,16 +130,7 @@ class pyTerrain(pyGLLib.GLApp):
 
 if __name__ == "__main__":
 
-    #points = map_gpx(sys.argv[1])
-
-    #points = []
-    #from line import bresenham
-    #points += bresenham((0,0),(10,10),5.0)
-    #points += bresenham((0,10),(10,0),5.0)
-
-    
-
-    app = pyTerrain( (800,600), (30,30), "pyTerrain Sample App", shadows=True, wireframe=False)
+    app = pyTerrain( (800,600), (30,30), "pyTerrain Sample App", shadows=False, wireframe=False)
     app.main()
     
 
