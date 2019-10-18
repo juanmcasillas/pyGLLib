@@ -9,8 +9,8 @@ class GLLight:
         self.pos = pos
         self.color = color
 
-        self.ambient = (0.5, 0.5, 0.5)
-        self.diffuse = (0.5, 0.5, 0.5)
+        self.ambient = (1.0, 1.0, 1.0)
+        self.diffuse = (1.0, 1.0, 1.0)
         # attenuation
         self.constant = 1.0
         self.linear = 0.09

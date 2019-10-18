@@ -8,6 +8,8 @@ import os
 #from OpenGL.GL import *
 import pyGLLib
 import numpy as np
+#import logging
+#logging.setLevel(logging.WARNING)
 
 def MTL(spath2, filename):
     contents = {}
@@ -25,21 +27,24 @@ def MTL(spath2, filename):
             raise ValueError("mtl file doesn't start with newmtl stmt")
         elif values[0] == 'map_Kd':
             # load the texture referred to by this declaration
+            
             mtl[values[0]] = values[1]
             smatpath=mtl['map_Kd']           
             smatpath=smatpath.replace("\\","/")
             #print("*", rpath + smatpath)
             
+            mtl["texture"] = pyGLLib.texture.GLTexture(rpath+smatpath).load()
+            mtl['texture_Kd'] = mtl["texture"].id
             #surf = pygame.image.load(rpath + smatpath)
             #image = pygame.image.tostring(surf, 'RGBA', 1)
             #ix, iy = surf.get_rect().size
-            #texid = mtl['texture_Kd'] = glGenTextures(1)
+            #texid = mtl['texture_Kd'] = glGenTextures(1)            
             #glBindTexture(GL_TEXTURE_2D, texid)
             #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
             #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
             #glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ix, iy, 0, GL_RGBA, GL_UNSIGNED_BYTE, image)
         else:
-            mtl[values[0]] = map(float, values[1:])
+            mtl[values[0]] = list(map(float, values[1:]))
     return contents
 
 class OBJ:
@@ -84,7 +89,7 @@ class OBJ:
                 face = []
                 texcoords = []
                 norms = []
-                for v in values[1:]:
+                for v in values[1:]:                  
                     w = v.split('/')
                     face.append(int(w[0]))
                     if len(w) >= 2 and len(w[1]) > 0:
@@ -107,52 +112,55 @@ class OBJ:
         for face in self.faces:
             vertices, normals, texture_coords, material = face
             mtl = self.mtl[material]
-            #print("#   ")
-            #print(mtl)
-            if 'texture_Kd' in mtl:
-                # use diffuse texmap
-                ##glBindTexture(GL_TEXTURE_2D, mtl['texture_Kd'])
-                pass
-            else:
-                # just use diffuse colour
-                #glColor(*mtl['Kd'])
-                ##glColor(1, 1, 1, 0.5)
-                pass
-            
+            #print(mtl.items())
+            #print(list(mtl["Kd"]))
+            #print(mtl["map_Kd"])
             #
             # juanm.casillas
             #
             # quick fix to load models in new profile (3.3 core)
             # ignore for now the color, and textures
             # next, learn how to texture things and do the work
-           
-            #glBegin(GL_POLYGON)            
+
             for i in range(len(vertices)):
-                if normals[i] > 0:
+                #if normals[i] > 0:
                     ##glNormal3fv(self.normals[normals[i] - 1])
-                    pass
-                if texture_coords[i] > 0:
+                #    pass
+                #if texture_coords[i] > 0:
                     ##glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
-                    pass
-                ##glVertex3fv(self.vertices[vertices[i] - 1])
-                ##print(np.asarray(self.vertices[vertices[i]-1]))
+                #    pass
                 
-                self.vertex += self.vertices[vertices[i]-1]
+                self.vertex += self.vertices[vertices[i]-1]                
+                
+                #print(tuple(mtl["Kd"]))
+                if "texture" in mtl.keys():
+                    #print("adding texture")
+                    self.vertex += tuple(mtl["Kd"])
+                else:
+                    #print("no data")
+                    self.vertex += tuple([0.0, 0.0, 0.0 ])
+                
                 self.vertex += self.normals[normals[i]-1]
-            #glEnd()  
-          
-        #glDisable(GL_TEXTURE_2D)
-        #glEndList()
+                self.vertex += tuple(self.texcoords[texcoords[i]-1])
+
+
         
-class GLObj(pyGLLib.object.GLObjectBaseNormal):
+class GLObj(pyGLLib.object.GLObject):
     "Use the EBO object as we have pos,normal in the coords"
     def __init__(self, fname):
         super().__init__()
         self.fname = fname
         self.obj = OBJ(fname, swapyz=True) 
-
+        for i,mat in self.obj.mtl.items():
+            if "texture" in mat.keys():
+                print("loaded texture %s" % i)
+                self.add_texture(mat["texture"])
 
     def load_model(self):
         
-        self.vertexData = np.asarray(self.obj.vertex, dtype=np.float32)        
-        triangles   = len(self.vertexData)/18
+        self.vertexData = np.asarray(self.obj.vertex, dtype=np.float32)   
+        self.triangles   = int(len(self.vertexData) / (11))
+        #self.vertexData = self.vertexData[0:500*11]
+        #print(np.array(self.vertexData).reshape( int(len(self.vertexData)/11), 11))
+
+        

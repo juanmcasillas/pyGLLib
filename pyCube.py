@@ -47,18 +47,18 @@ class pyCube(pyGLLib.GLApp):
             shader = "ambient"
         else:
             shader = "diffuse"
-            self.shaders[shader].use()
-            self.shaders[shader].setMat4(b'model',self.model_matrix)
-            self.shaders[shader].setMat4(b'view',self.view_matrix)
-            self.shaders[shader].setMat4(b'projection',self.projection_matrix)
-            self.shaders[shader].setVec3(b'objectColor',(1.0,0.5,0.5))
-            self.shaders[shader].setVec3(b'light.color',self.light.color)
-            self.shaders[shader].setVec3(b'light.diffuse',self.light.diffuse)
-            self.shaders[shader].setVec3(b'light.position',self.light.pos)
-            self.shaders[shader].setVec3(b'light.ambient',self.light.ambient)
-            self.shaders[shader].setFloat(b'light.constant',self.light.constant)
-            self.shaders[shader].setFloat(b'light.linear',self.light.linear)
-            self.shaders[shader].setFloat(b'light.quadratic',self.light.quadratic)      
+        self.shaders[shader].use()
+        self.shaders[shader].setMat4(b'model',self.model_matrix)
+        self.shaders[shader].setMat4(b'view',self.view_matrix)
+        self.shaders[shader].setMat4(b'projection',self.projection_matrix)
+        self.shaders[shader].setVec3(b'objectColor',(1.0,0.5,0.5))
+        self.shaders[shader].setVec3(b'light.color',self.light.color)
+        self.shaders[shader].setVec3(b'light.diffuse',self.light.diffuse)
+        self.shaders[shader].setVec3(b'light.position',self.light.pos)
+        self.shaders[shader].setVec3(b'light.ambient',self.light.ambient)
+        self.shaders[shader].setFloat(b'light.constant',self.light.constant)
+        self.shaders[shader].setFloat(b'light.linear',self.light.linear)
+        self.shaders[shader].setFloat(b'light.quadratic',self.light.quadratic)      
         self.objects["cube"].draw()
 
         # draw the "light"

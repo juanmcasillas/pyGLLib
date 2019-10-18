@@ -13,7 +13,7 @@ import math
 import glm 
 import cv2
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 from .camera import GLCamera
 from .shader import GLShaderPlain, GLShaderVertexColor

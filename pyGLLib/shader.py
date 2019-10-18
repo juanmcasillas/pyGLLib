@@ -209,7 +209,7 @@ class GLShaderAmbient(GLShaderBase):
                         
                 //ambient  *= attenuation; 
                 //diffuse  *= attenuation;
-
+    
                 vec3 result = (ambient + diffuse) * objectColor;
                 FragColor = vec4(result, 1.0);
             } 
@@ -290,3 +290,98 @@ class GLShaderDiffuse(GLShaderBase):
                 FragColor = vec4(result, 1.0);
             } 
             """
+
+# ///////////////////////////////////////////////////////////////////////////
+#
+# WIPWIP new Shader
+# only work with this one
+#
+# ///////////////////////////////////////////////////////////////////////////
+class GLShaderStandard(GLShaderBase):
+    "support for pos,color,normal, uv"
+    def __init__(self):
+        # vertex shader (deals with the geometric transformations)
+        # this version support ambient + diffuse lightning (normals)
+        self.program = None
+        self.vertex_shader = """
+            #version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aColor;
+            layout (location = 2) in vec3 aNormal;
+            layout (location = 3) in vec2 aTexCoord;
+
+            out vec3 FragPos;
+            out vec3 Color;
+            out vec3 Normal;
+            out vec2 TexCoord;
+
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+
+            void main()
+            {
+                FragPos = vec3(model * vec4(aPos, 1.0));
+                gl_Position = projection * view * vec4(FragPos, 1.0);
+                Color = aColor;
+                Normal = aNormal;  
+                TexCoord = aTexCoord;
+            }
+            """
+
+        # fragment shader (deals with the color)
+        self.fragment_shader = """
+            #version 330 core
+            in vec3 FragPos;  
+            in vec3 Color;
+            in vec3 Normal;  
+            in vec2 TexCoord;
+                        
+            out vec4 FragColor;
+
+            struct Light {
+                vec3 position;
+                vec3 diffuse;
+                vec3 color;
+                vec3 ambient;
+
+                float constant;
+                float linear;
+                float quadratic;
+            };             
+            uniform Light light;            
+            uniform vec3 objectColor;
+            uniform sampler2D ourTexture;
+
+            void main()
+            {
+                // ambient
+                vec3 ambient = light.ambient * light.color;
+                
+                // diffuse 
+                vec3 norm = normalize(Normal);
+                vec3 lightDir = normalize(light.position - FragPos);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 diffuse = light.diffuse * diff * light.color;
+
+                // attenuation
+                float distance = length(light.position - FragPos);
+                float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
+                        
+                ambient  *= attenuation; 
+                diffuse  *= attenuation;
+
+                vec3 result;
+
+                if (objectColor != vec3(0.0, 0.0, 0.0)) {
+                    result = (ambient + diffuse) * objectColor;
+                } else {
+                    result = (ambient + diffuse) * Color;
+                }
+                // check if texture
+                // tb this
+                //FragColor = vec4(result, 1.0);
+                //FragColor = texture(ourTexture, TexCoord);
+                FragColor = texture(ourTexture, TexCoord) * vec4(result, 1.0);
+            } 
+            """            
