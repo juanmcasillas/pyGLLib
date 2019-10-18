@@ -142,6 +142,7 @@ class GLTerrain(pyGLLib.object.GLObjectBaseEBO):
                 self.terrain.set(i,j,k)
         else:
             self.terrain.fillRandom()
+            
         W = self.terrain.width-1
         H = self.terrain.height-1
         D = max(self.terrain.width,self.terrain.height)

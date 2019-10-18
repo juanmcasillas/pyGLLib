@@ -388,3 +388,118 @@ class LocationDelta:
 
     def move_by_lat_lon_diff(self, location):
         return location.latitude + self.latitude_diff, location.longitude + self.longitude_diff
+
+###########
+# jmc adds
+###########
+
+def bearing(pointA, pointB):
+    """
+    Calculates the bearing between two points.
+
+    The formulae used is the following:
+        θ = atan2(sin(Δlong).cos(lat2),
+                  cos(lat1).sin(lat2) − sin(lat1).cos(lat2).cos(Δlong))
+
+    :Parameters:
+      - `pointA: The tuple representing the latitude/longitude for the
+        first point. Latitude and longitude must be in decimal degrees
+      - `pointB: The tuple representing the latitude/longitude for the
+        second point. Latitude and longitude must be in decimal degrees
+
+    :Returns:
+      The bearing in degrees
+
+    :Returns Type:
+      float
+    """
+
+
+    lat1 = mod_math.radians(pointA.latitude)
+    lat2 = mod_math.radians(pointB.latitude)
+
+    diffLong = mod_math.radians(pointB.longitude - pointA.longitude)
+
+    x = mod_math.sin(diffLong) * mod_math.cos(lat2)
+    y = mod_math.cos(lat1) * mod_math.sin(lat2) - (mod_math.sin(lat1)
+            * mod_math.cos(lat2) * mod_math.cos(diffLong))
+
+    initial_bearing = mod_math.atan2(x, y)
+
+    # Now we have the initial bearing but math.atan2 return values
+    # from -180° to + 180° which is not what we want for a compass bearing
+    # The solution is to normalize the initial bearing as shown below
+    initial_bearing = mod_math.degrees(initial_bearing)
+    compass_bearing = (initial_bearing + 360) % 360
+
+    return compass_bearing
+
+def bearing_atan(pointA, pointB):
+    """
+    Calculates the bearing between two points.
+
+    The formulae used is the following:
+        θ = atan2(sin(Δlong).cos(lat2),
+                  cos(lat1).sin(lat2) − sin(lat1).cos(lat2).cos(Δlong))
+
+    :Parameters:
+      - `pointA: The tuple representing the latitude/longitude for the
+        first point. Latitude and longitude must be in decimal degrees
+      - `pointB: The tuple representing the latitude/longitude for the
+        second point. Latitude and longitude must be in decimal degrees
+
+    :Returns:
+      The bearing in degrees
+
+    :Returns Type:
+      float
+    """
+
+
+    lat1 = mod_math.radians(pointA.latitude)
+    lat2 = mod_math.radians(pointB.latitude)
+
+    diffLong = mod_math.radians(pointB.longitude - pointA.longitude)
+
+    x = mod_math.sin(diffLong) * mod_math.cos(lat2)
+    y = mod_math.cos(lat1) * mod_math.sin(lat2) - (mod_math.sin(lat1)
+            * mod_math.cos(lat2) * mod_math.cos(diffLong))
+
+    initial_bearing = mod_math.atan2(x, y)
+
+    # Now we have the initial bearing but math.atan2 return values
+    # from -180° to + 180° which is not what we want for a compass bearing
+    # The solution is to normalize the initial bearing as shown below
+    # initial_bearing = mod_math.degrees(initial_bearing)
+    # compass_bearing = (initial_bearing + 360) % 360
+
+    return initial_bearing
+
+# jmc hack
+def center(points):
+    """
+    Get the center of the route.
+
+    Returns
+    -------
+    center: Location
+        latitude: latitude of center in degrees
+        longitude: longitude of center in degrees
+        elevation: not calculated here
+    """
+    if not points:
+        return None
+
+    sum_lat = 0.
+    sum_lon = 0.
+    n = 0.
+
+    for point in points:
+        n += 1.
+        sum_lat += point.latitude
+        sum_lon += point.longitude
+
+    if not n:
+        return Location(float(0), float(0))
+
+    return Location(latitude=sum_lat / n, longitude=sum_lon / n)

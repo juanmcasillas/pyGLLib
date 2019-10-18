@@ -12,6 +12,7 @@ import glm
 import sys
 import numpy as np
 import math
+import argparse
 
 from gpx import GLRoad
 
@@ -115,12 +116,20 @@ class pyTerrain(pyGLLib.GLApp):
 
     def main(self, points=None):
 
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-v", "--verbose", help="Show data about file and processing", action="count")
+        parser.add_argument("-o", "--optimize", help="Optimize GPX input(filter)", action="store_true")
+        parser.add_argument("gpx_file", help="GPX file to load")
+        args = parser.parse_args()
+
+
         self.init()
         # all gl calls must be done AFTER init() or doesn't work
-        terrain = GLTerrain(self.tsize, points)
+        terrain = GLTerrain(self.tsize)
         terrain.load()
 
-        road = GLRoad("run2.GPX")
+        road = GLRoad(args.gpx_file,  optimize=args.optimize)
         road.load()
 
         cube = pyGLLib.object.GLCube()

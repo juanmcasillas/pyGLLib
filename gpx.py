@@ -18,6 +18,8 @@ import math
 import pyGLLib
 np.set_printoptions(precision=4, floatmode="fixed", suppress=True)
 
+from gpx_optimizer import GPXOptimizer, savitzky_golay
+
 def test_gpx(fname):
 
     # a = [1, 1, 1, 
@@ -47,7 +49,7 @@ def test_gpx(fname):
     # d = np.array(points).reshape(int(len(points)/3),3)
     # x = d[:,[0]]
     # y = d[:,[1]]
-    # plt.plot(x,y)
+    # plt.plot(x,y, linestyle="", marker="o")
     # plt.show()
 
     #
@@ -118,8 +120,9 @@ class ProjectionMapper:
 #
 # ///////////////////////////////////////////////////////////////////////////
 class GPXLoader:
-    def __init__(self, fname=None):
+    def __init__(self, fname=None, optimize=False):
         self.fname = fname
+        self.optimize = optimize
 
     def load(self,fname=None):
         f = fname or self.fname
@@ -134,15 +137,39 @@ class GPXLoader:
         points = []
         pm = ProjectionMapper()
 
+        # call my optimizer (remove contiguous points)
+        points = []
         for track in gpx_data.tracks:
             for segment in track.segments:
-                for point in segment.points:
-                    z, l, x, y = pm.project((point.longitude, point.latitude))
-                    point.x = x
-                    point.y = y
-                    points += [x, y, point.elevation]
+                points += segment.points
+
+        if self.optimize:
+            gpx_optmizer = GPXOptimizer()
+            opt_points = gpx_optmizer.Optimize(points)
+            gpx_optmizer.Print_stats()
+            points = opt_points
+            elevs = []
+        ret_points = []
         
-        return points
+        for point in points:
+            z, l, x, y = pm.project((point.longitude, point.latitude))
+            point.x = x
+            point.y = y
+            ret_points += [x, y, point.elevation]
+            self.optimize and elevs.append(point.elevation)
+        
+        if self.optimize:
+            #smoothed_elevations = np.array(savitzky_golay( np.array(elevs) , 135, 5))
+            smoothed_elevations = savitzky_golay( np.array(elevs) , 11, 5)
+            #idx = np.arange(0,44)
+            #import matplotlib.pyplot as plt
+            #plt.plot(idx,elevs[0:44])
+            #plt.plot(idx,smoothed_elevations[0:44])
+            #plt.show()
+            ret_points = np.array(ret_points).reshape( int(len(ret_points)/3), 3)
+            ret_points[:,2] = smoothed_elevations[0:len(elevs)]
+
+        return(ret_points)
 
 
 # ///////////////////////////////////////////////////////////////////////////
@@ -279,17 +306,29 @@ class BoundingBox(object):
             self.minx, self.maxx, self.miny, self.maxy, self.minz, self.maxz)
 
 
+def V_M(U):
+    "calculate the modulus"
+    module = np.sqrt( math.pow(U[0],2) + math.pow(U[1],2) + math.pow(U[2],2) )
+    return module
+
 def V_U(U):
     "calculate unitary vector"
-    module = np.sqrt( math.pow(U[0],2) + math.pow(U[1],2) + math.pow(U[2],2) )
+    module = V_M(U)
+    if module == 0.0:
+        print("Offending vector: ",U)
+        raise RuntimeError()
     U = U/module  
     return U  
 
 def calc_normal_from_triangle(triangle):
     
-    normals = [0.0]*3
+    normals = [[0.0,0.0,0.0]]*3
     Q,R,S = triangle
-    #print(t, "->", Q,R,S)
+    
+    if np.array_equal(Q,R) or np.array_equal(Q,S):
+        print("Same vectors detected: ",Q,R,S)
+        return normals
+
 
     #first vertex
     QR = R-Q
@@ -352,8 +391,17 @@ class RoadGenerator(object):
             # this is the NORMAL vector 
             #T1 = np.array(( -PQ[1], 0.0, PQ[0])) * distance
             #T2 = np.array(( PQ[1], 0.0, -PQ[0])) * distance
-            T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), 0.0))) * distance
-            T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), 0.0))) * distance            
+            if V_M(PQ) < 0.1:
+                print("points are too near, skipping them")
+                continue
+            
+            #T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), PQ[2]))) * distance
+            #T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), PQ[2]))) * distance           
+
+            T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), abs(PQ[2])))) * distance
+            T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), abs(PQ[2])))) * distance            
+            #T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), 0.0))) * distance
+            #T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), 0.0))) * distance            
   
 
             T1 = P + T1 
@@ -422,13 +470,14 @@ def draw(points):
 
 class GLRoad(pyGLLib.object.GLObjectBaseNormal):
     
-    def __init__(self, fname, distance=5):
+    def __init__(self, fname, distance=5, optimize=False):
         super().__init__()
         self.fname = fname
         self.distance = distance
+        self.optimize = optimize
 
     def load_model(self):
-        loader = GPXLoader(self.fname)
+        loader = GPXLoader(self.fname, self.optimize)
         points = loader.load() 
 
         # points = [

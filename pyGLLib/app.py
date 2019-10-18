@@ -130,7 +130,7 @@ class GLApp:
 
 
         camera_speed = self.camera.speed * self.camera.delta_time
-
+ 
         if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
             glfw.set_window_should_close(window,glfw.TRUE)
 
@@ -216,6 +216,7 @@ class GLApp:
             # set view, model and projection matrices
             self.model_matrix = glm.mat4(1.0)
             self.projection_matrix = glm.perspective(glm.radians(self.camera.fov), self.aspect, 0.1, 100.0)
+            #self.projection_matrix = glm.ortho(0,40,40,0,0.1,100)
             self.view_matrix = glm.lookAt(self.camera.pos, self.camera.pos + self.camera.front, self.camera.up)
 
             # render the thing.
