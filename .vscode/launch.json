@@ -16,7 +16,7 @@
         "type": "python",
         "request": "launch",
         "program": "${workspaceFolder}/pyTerrain.py",
-        "args" : ["run2.GPX"]
+        "args" : ["road.gpx"]
     },
 
     {

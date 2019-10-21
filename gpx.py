@@ -95,7 +95,7 @@ class ProjectionMapper:
     def letter(self,coordinates):
         return 'CDEFGHJKLMNPQRSTUVWXX'[int((coordinates[1] + 80) / 8)]
 
-    def project(self,coordinates):
+    def project(self,coordinates): # lon, lat
         z = self.zone(coordinates)
         l = self.letter(coordinates)
         if z not in self._projections:
@@ -104,6 +104,13 @@ class ProjectionMapper:
         if y < 0:
             y += 10000000
         return z, l, x, y
+
+    def project_2(self, lon, lat):
+        
+        myProj = pyproj.Proj("+proj=utm +zone=30T, +north +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+        UTMx, UTMy = myProj(lon, lat)
+        #print(lat, lon, UTMx, UTMy)
+        return (UTMx, UTMy)
 
     def unproject(self, z, l, x, y):
         if z not in self._projections:
@@ -153,6 +160,7 @@ class GPXLoader:
         
         for point in points:
             z, l, x, y = pm.project((point.longitude, point.latitude))
+            #x,y = pm.project_2(point.longitude, point.latitude)
             point.x = x
             point.y = y
             ret_points += [x, y, point.elevation]
@@ -168,7 +176,6 @@ class GPXLoader:
             #plt.show()
             ret_points = np.array(ret_points).reshape( int(len(ret_points)/3), 3)
             ret_points[:,2] = smoothed_elevations[0:len(elevs)]
-
 
         return(ret_points)
 
@@ -359,15 +366,14 @@ def remove_duplicates(points):
 class RoadGenerator(object):
     def __init__(self, points):
         # build a [len,3] matrix
-        self.interp_range = ( (-1,1), (-1,1), (0,1) )
+        self.interp_range = ( (-1,1), (-1,1), (0,10) ) # z big reduces the elev exageration 10 for bike, 2 for run.
         self.bb = BoundingBox()
 
-       
         self.points = self.bb.calculate(points, offset=True)
         self.points = np.array(self.points).reshape(int(len(self.points)/3),3)
-        self.points = remove_duplicates(self.points)
-        #print("ZZ", len(self.points)) # 7587.0
+        #self.points = remove_duplicates(self.points)
         
+  
         #self.f32sz = np.dtype(np.float32).itemsize
     
     def normalize(self, points):
@@ -396,7 +402,7 @@ class RoadGenerator(object):
             # this is the NORMAL vector 
             #T1 = np.array(( -PQ[1], 0.0, PQ[0])) * distance
             #T2 = np.array(( PQ[1], 0.0, -PQ[0])) * distance
-            if V_M(PQ) < 0.1:          
+            if V_M(PQ) < 0.01:          
                 print("points are too near, skipping them")
                 continue
             if PQ[0] == PQ[1] == 0.0:            
@@ -430,7 +436,15 @@ class RoadGenerator(object):
         #7587
         print("%d points loaded" % len(self.points))
 
-       
+        #self.points=self.points[0:30]
+        #print(self.points)
+        # import matplotlib.pyplot as plt
+        # d = self.points
+        # x = d[:,[0]]
+        # y = d[:,[1]]
+        # plt.scatter(x,y)
+        # plt.show()  
+
         triangles = []
         quads = self.add_perpendicular(distance)
  
@@ -531,3 +545,13 @@ class GLRoad(pyGLLib.object.GLObjectBaseNormal):
 
 if __name__ == "__main__":
     test_gpx(sys.argv[1])
+
+
+
+# <trkpt lat="40.3607123997" lon="-4.39237592742">
+# LAT: 40,360712
+# LON: -4,392376
+# UTM: 
+# EASTING  381773.05,    |379616.8156
+# NORTHING: 4468724.38   |4467918.9641 
+# ZONE: 30T
