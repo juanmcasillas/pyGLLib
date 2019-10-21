@@ -109,7 +109,8 @@ class pyObjViewer(pyGLLib.GLApp):
 
         self.init()
         # all gl calls must be done AFTER init() or doesn't work
-        obj = GLObj("Models/cube.obj")
+        obj = GLObj("Models/mayacube.obj")
+        #obj = GLObj("Models/cube.obj")
         #obj = GLObj("Models/Charizard.obj")
         #obj = GLObj("Models/pikachu.obj")
         obj.load()

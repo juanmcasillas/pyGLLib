@@ -169,6 +169,7 @@ class GPXLoader:
             ret_points = np.array(ret_points).reshape( int(len(ret_points)/3), 3)
             ret_points[:,2] = smoothed_elevations[0:len(elevs)]
 
+
         return(ret_points)
 
 
@@ -217,10 +218,8 @@ class BoundingBox(object):
 
             self.minx_o = self.minx
             self.maxx_o = self.maxx
-
             self.miny_o = self.miny
             self.maxy_o = self.maxy
-
             self.minz_o = self.minz
             self.maxz_o = self.maxz
 
@@ -282,6 +281,7 @@ class BoundingBox(object):
         """(x,y) center point of the bounding box"""
         # minz to offset the heights to 0
         mz = (self.maxz-self.minz)/2
+        #mz = self.minz
         return (self.minx + self.width / 2, self.miny + self.height / 2, mz)
 
     @property
@@ -359,12 +359,17 @@ def remove_duplicates(points):
 class RoadGenerator(object):
     def __init__(self, points):
         # build a [len,3] matrix
-        self.interp_range = ( (-1,1), (-1,1), (-1,1) )
+        self.interp_range = ( (-1,1), (-1,1), (0,1) )
         self.bb = BoundingBox()
+
+       
         self.points = self.bb.calculate(points, offset=True)
         self.points = np.array(self.points).reshape(int(len(self.points)/3),3)
         self.points = remove_duplicates(self.points)
-
+        #print("ZZ", len(self.points)) # 7587.0
+        
+        #self.f32sz = np.dtype(np.float32).itemsize
+    
     def normalize(self, points):
         bb = BoundingBox()
         points = bb.calculate(points, interp=self.interp_range, normals=True)
@@ -391,17 +396,24 @@ class RoadGenerator(object):
             # this is the NORMAL vector 
             #T1 = np.array(( -PQ[1], 0.0, PQ[0])) * distance
             #T2 = np.array(( PQ[1], 0.0, -PQ[0])) * distance
-            if V_M(PQ) < 0.1:
+            if V_M(PQ) < 0.1:          
                 print("points are too near, skipping them")
                 continue
+            if PQ[0] == PQ[1] == 0.0:            
+                print("vector is the same. Skipping (maybe different altitude)")
+                continue
+
+            #print("distance PQ: %3.3f, %3.3f, %3.3f (eD: %3.3f)" % (V_M(PQ),P[2],Q[2],Q[2]-P[2]))
             
             #T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), PQ[2]))) * distance
             #T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), PQ[2]))) * distance           
 
-            T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), abs(PQ[2])))) * distance
-            T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), abs(PQ[2])))) * distance            
-            #T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), 0.0))) * distance
-            #T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), 0.0))) * distance            
+            # this uses the 3D position of the point, creating a non-leveled road
+            #T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), abs(PQ[2])))) * distance
+            #T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), abs(PQ[2])))) * distance            
+            # this creates a leveled road.
+            T1 = V_U(np.array(( -abs(PQ[1]),  abs(PQ[0]), 0.0))) * distance
+            T2 = V_U(np.array((  abs(PQ[1]), -abs(PQ[0]), 0.0))) * distance            
   
 
             T1 = P + T1 
@@ -415,6 +427,10 @@ class RoadGenerator(object):
         # Q1, Q, Q2
         # ....
         
+        #7587
+        print("%d points loaded" % len(self.points))
+
+       
         triangles = []
         quads = self.add_perpendicular(distance)
  
@@ -489,7 +505,7 @@ class GLRoad(pyGLLib.object.GLObjectBaseNormal):
         # points = np.array(points).reshape(4,3)
 
 
-        
+       
         roadgen = RoadGenerator(points)
         self.vertexData = roadgen.build(self.distance)
 
