@@ -34,6 +34,39 @@ ONE_DEGREE = (2*mod_math.pi*EARTH_RADIUS) / 360  # ==> 111.319 km
 def to_rad(x):
     return x / 180. * mod_math.pi
 
+def gradeslope(distance, elevation):
+    
+    if distance == 0.0 or elevation == 0.0: 
+        return 0.0
+    
+    r = mod_math.pow(distance, 2) - mod_math.pow(elevation, 2)
+
+    d = distance    
+    if r > 0.0: 
+        d = mod_math.sqrt( r )
+        
+    # infinite slope
+    #if d == 0: 
+    #    if elevation < 0: return -45.0
+    #    return 45.0
+    
+    s = (elevation / d) * 100.0             # projected distance (horizontal)
+    s = (elevation / distance) * 100.0      # aproximation
+    
+    #print "distance: %3.2f elevation: %3.2f d: %3.2f s: %3.2f " % (distance,elevation,d, s)
+    return s
+
+def distancePoints(A, B):
+
+    return distance( A.latitude, A.longitude, A.elevation,
+                     B.latitude, B.longitude, B.elevation,
+                     haversine=False )
+
+def distancePoints3D(A, B):
+
+    return distance( A.latitude, A.longitude, A.elevation,
+                     B.latitude, B.longitude, B.elevation,
+                     haversine=True )
 
 def haversine_distance(latitude_1, longitude_1, latitude_2, longitude_2):
     """

@@ -4,6 +4,17 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
+
+    {
+      "name": "Python: Simulator",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/simulator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "road.gpx"
+      ]
+    },
     {
       "name": "Python: Current File (Integrated Terminal)",
       "type": "python",
@@ -12,11 +23,11 @@
       "console": "integratedTerminal"
     },
     {
-        "name": "Python: pyTerrain.py",
-        "type": "python",
-        "request": "launch",
-        "program": "${workspaceFolder}/pyTerrain.py",
-        "args" : ["road.gpx"]
+      "name": "Python: pyTerrain.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/pyTerrain.py",
+      "args": ["road.gpx"]
     },
 
     {
